@@ -4,7 +4,7 @@ import datetime
 from django.db import models
 from django.conf import settings
 from django.utils.http import int_to_base36
-from django.utils.hashcompat import sha_constructor
+from hashlib import sha1 as sha_constructor
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import User
 from django.core.mail import send_mail, EmailMultiAlternatives

@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.views.generic.simple import direct_to_template
 from django.template.loader import render_to_string, get_template
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
@@ -8,6 +7,8 @@ from django.contrib.sites.models import Site
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils.safestring import mark_safe
+from django.shortcuts import render, render_to_response
+from django.template import RequestContext
 
 if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
     from allauth.socialaccount.views import signup as allauth_signup
@@ -47,7 +48,7 @@ def invited(request, invitation_key=None, invitation_recipient=None, extra_conte
                 request.session['invitation_recipient'] = invitation_recipient
                 request.session['invitation_context'] = extra_context or {}
 
-        return direct_to_template(request, template_name, extra_context)
+        return render(request, template_name, extra_context)
     else:
         return HttpResponseRedirect(reverse('registration_register'))
 
@@ -72,7 +73,7 @@ def register(request, backend, success_url=None,
                 extra_context.update({'invalid_key': True})
         else:
             extra_context.update({'no_key': True})
-        return direct_to_template(request, wrong_template_name, extra_context)
+        return render(request, wrong_template_name, extra_context)
     else:
         return registration_register(request, backend, success_url, form_class,
                                      disallowed_url, template_name, extra_context)
@@ -107,7 +108,7 @@ def invite(request, success_url=None,
             'remaining_invitations': remaining_invitations,
             'email_preview': render_to_string('invitation/invitation_email.html', preview_context),
         })
-    return direct_to_template(request, template_name, extra_context)
+    return render(request, template_name, extra_context)
 invite = login_required(invite)
 
 
@@ -141,8 +142,11 @@ def send_bulk_invitations(request, success_url=None):
             'html_preview': render_to_string('invitation/invitation_email.html', preview_context),
             'text_preview': render_to_string('invitation/invitation_email.txt', preview_context),
         }
-        return direct_to_template(request, 'invitation/invitation_form_bulk.html',
-            context)
+        #return render(request, 'invitation/invitation_form_bulk.html', context)
+        return render_to_response('invitation/invitation_form_bulk.html',
+                          context,
+                          context_instance=RequestContext(request))
+            
 
 from django.shortcuts import redirect
 from django.core.files.storage import default_storage

@@ -26,7 +26,10 @@ previously sent invitations using this format.  This will be removed at a later 
 
 Django Allauth integration
 --------------------------
-***1)*** Create an accountadapter.py file and locate it in your project diretory.  accountadapter.py contents:  
+***1)*** Follow the setup instructions for django-invitation: 
+http://code.larlet.fr/django-invitation/wiki/Home 
+***2)*** Create an accountadapter.py file and locate it in your project diretory.  Example accountadapter.py contents:
+NOTE: if you are using the account adapter exactly as writen below, make usure you specify DEFAULT_USER_GROUP in your settings. 
 
     from allauth.account.adapter import DefaultAccountAdapter
 	from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
@@ -82,13 +85,13 @@ Django Allauth integration
 				del request.session['invitation_recipient']
 				del request.session['invitation_context']
 
-***2)*** in your settings point SOCIALACCOUNT_ADAPTER to the accountadapter.py file you created above(this is required):  
+
+***3)*** in your settings point SOCIALACCOUNT_ADAPTER to the accountadapter.py file you created above(this is required):  
 SOCIALACCOUNT_ADAPTER ="myprojectname.accountadapter.SocialAccountAdapter"
 
-***3)*** add ALLOW_NEW_REGISTRATIONS = True/False to your settings file:
+***4)*** Add the setting `INVITATION_USE_ALLAUTH = True` to your settings.
+
+***5)*** add ALLOW_NEW_REGISTRATIONS = True/False to your settings file:
 This setting allows you to block all new registrations even with a valid invitation.
 
 
-
-DOCUMENTATION:django-inviation  
-http://code.larlet.fr/django-invitation/wiki/Home

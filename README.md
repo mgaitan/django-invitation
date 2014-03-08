@@ -28,8 +28,12 @@ Django Allauth integration
 --------------------------
 ***1)*** Follow the setup instructions for django-invitation: 
 http://code.larlet.fr/django-invitation/wiki/Home 
-***2)*** Create an accountadapter.py file and locate it in your project diretory.  Example accountadapter.py contents:
-NOTE: if you are using the account adapter exactly as writen below, make usure you specify DEFAULT_USER_GROUP in your settings. 
+
+***2)*** Create an accountadapter.py file and locate it in your project diretory.
+
+NOTE: if you are using the account adapter exactly as writen below, make sure you specify DEFAULT_USER_GROUP in your settings.
+
+Example accountadapter.py: 
 
     from allauth.account.adapter import DefaultAccountAdapter
 	from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
@@ -86,7 +90,7 @@ NOTE: if you are using the account adapter exactly as writen below, make usure y
 				del request.session['invitation_context']
 
 
-***3)*** in your settings point SOCIALACCOUNT_ADAPTER to the accountadapter.py file you created above(this is required):  
+***3)*** In your settings point SOCIALACCOUNT_ADAPTER to the accountadapter.py file you created above (this is required):  
 SOCIALACCOUNT_ADAPTER ="myprojectname.accountadapter.SocialAccountAdapter"
 
 ***4)*** Add the setting `INVITATION_USE_ALLAUTH = True` to your settings.

@@ -23,6 +23,7 @@ import urllib2
 from django.core.files.temp import NamedTemporaryFile
 from django.core.files import File
 from urlparse import urlparse, urlunparse
+from django.db import connection
 
 
 if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
@@ -31,8 +32,13 @@ if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
 else:    
     from registration.models import SHA1_RE
 
-site = Site.objects.get_current()
-root_url = 'http://%s' % site.domain
+# prevent error on initial syncdb for apps that incorporate django-invitaion
+try:
+    site = Site.objects.get_current()
+    root_url = 'http://%s' % site.domain
+except:
+    connection.close()
+
     
 class InvitationKeyManager(models.Manager):
     def get_key(self, invitation_key):
@@ -226,7 +232,11 @@ def user_post_save(sender, instance, created, **kwargs):
         invitation_user = InvitationUser()
         invitation_user.inviter = instance
         invitation_user.invitations_remaining = settings.INVITATIONS_PER_USER
-        invitation_user.save()
+        # prevent error on syncdb when superuser is created
+        try:
+            invitation_user.save()
+        except:
+            connection.close()
 
 models.signals.post_save.connect(user_post_save, sender=User)
 

@@ -3,12 +3,13 @@ from django.template.loader import render_to_string, get_template
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
 from django.contrib.auth.decorators import login_required
-from django.contrib.sites.models import Site
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import messages
 from django.utils.safestring import mark_safe
 from django.shortcuts import render, render_to_response
 from django.template import RequestContext
+
+from invitation.utils import get_site
 
 if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
     from allauth.socialaccount.views import signup as allauth_signup
@@ -54,7 +55,7 @@ def invited(request, invitation_key=None, invitation_recipient=None, extra_conte
         if valid_key_obj:
             invitation_recipient = valid_key_obj.recipient or invitation_recipient
             extra_context.update({'invitation_recipient': invitation_recipient})
-            request.session['invitation_key'] = valid_key_obj
+            request.session['invitation_key'] = invitation_key
             request.session['invitation_recipient'] = invitation_recipient
             request.session['invitation_context'] = extra_context or {}
                 
@@ -100,8 +101,8 @@ def invite(request, success_url=None,
                           remaining_invitations=remaining_invitations, 
                           user=request.user)
         if form.is_valid():
-            recipient = form.cleaned_data["recipient"]
-            sender_note = form.cleaned_data["sender_note"]
+            recipient = form.cleaned_data.get("recipient")
+            sender_note = form.cleaned_data.get("sender_note")
             invitation = InvitationKey.objects.create_invitation(request.user, recipient)
             invitation.send_to(sender_note=sender_note)
             # success_url needs to be dynamically generated here; setting a
@@ -124,7 +125,7 @@ invite = login_required(invite)
 
 @staff_member_required
 def send_bulk_invitations(request, success_url=None):
-    current_site = Site.objects.get_current()
+    current_site, root_url = get_site(request)
     if request.POST.get('post'):
         to_emails = [(e.split(',')[0].strip(),e.split(',')[1].strip() or None,e.split(',')[2].strip() or None) if e.find(',')+1 else (e.strip() or None, None, None) for e in request.POST['to_emails'].split(';')]
         #to_emails = [(e.split(',')[0],e.split(',')[1]) if e.find(',') else tuple('',e) for e in request.POST['to_emails'].split(';')]
@@ -171,7 +172,7 @@ def token(request, key):
     token is returned or else a token image marked invalid is returned.
     '''
     print  '---token'
-    site = Site.objects.get_current()
+    site = get_site(request)
     scheme = 'http'
     if request.is_secure():
         scheme = 'https'

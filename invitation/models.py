@@ -8,12 +8,13 @@ from hashlib import sha1 as sha_constructor
 from django.utils.translation import ugettext_lazy as _
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
-from django.contrib.sites.models import Site
 from django.utils.timezone import now
 from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 from django.core.urlresolvers import reverse
 from django.core.files.storage import default_storage
+
+from invitation.utils import get_site
 
 #token imports
 from PIL import Image, ImageFont, ImageDraw, ImageOps
@@ -29,14 +30,6 @@ if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
     SHA1_RE = re.compile('^[a-f0-9]{40}$')
 else:    
     from registration.models import SHA1_RE
-
-# prevent error on initial syncdb for apps that incorporate django-invitaion
-try:
-    site = Site.objects.get_current()
-    root_url = 'http://%s' % site.domain
-except:
-    connection.close()
-
     
 class InvitationKeyManager(models.Manager):
     def get_key(self, invitation_key):
@@ -104,6 +97,7 @@ class InvitationKey(models.Model):
     
     # -1 duration means the key won't expire
     duration = models.IntegerField(default=settings.ACCOUNT_INVITATION_DAYS, null=True, blank=True)
+    
     objects = InvitationKeyManager()
     
     recipient = PickledObjectField(default=None, null=True)
@@ -157,6 +151,7 @@ class InvitationKey(models.Model):
         self.save()
     
     def get_context(self, sender_note=None):
+        site, root_url = get_site()
         invitation_url = root_url + reverse('invitation_invited', kwargs={'invitation_key':self.key})
         exp_date = self.date_invited + datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS)
         context = { 'invitation_key': self,

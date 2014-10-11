@@ -17,13 +17,14 @@ getting django-invitation running in the default setup, to wit:
 """
 
 import datetime
-import sha
+from hashlib import sha1 as sha
 
 from django.conf import settings
 from django.core import mail
 from django.core import management
 from django.core.urlresolvers import reverse
 from django.test import TestCase
+
 from django.contrib.sites.models import Site
 
 try:
@@ -62,6 +63,7 @@ class InvitationTestCase(TestCase):
     used to exercise various parts of the application.
     
     """
+    fixtures = ['testserver.json']
     def setUp(self):        
         self.sample_user = User.objects.create_user(username='alice',
                                                     password='secret',

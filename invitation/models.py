@@ -95,7 +95,7 @@ class InvitationKeyManager(models.Manager):
 
 
 class InvitationKey(models.Model):
-    key = models.CharField(_('invitation key'), max_length=40)
+    key = models.CharField(_('invitation key'), max_length=40, db_index=True)
     date_invited = models.DateTimeField(_('date invited'), 
                                         auto_now_add=True)
     from_user = models.ForeignKey(User, 
@@ -104,6 +104,8 @@ class InvitationKey(models.Model):
                                   related_name='invitations_used')
     uses_left = models.IntegerField(default=1)
     
+    # -1 duration means the key won't expire
+    duration = models.IntegerField(default=settings.ACCOUNT_INVITATION_DAYS, null=True, blank=True)
     objects = InvitationKeyManager()
     
     recipient = PickledObjectField(default=None, null=True)
@@ -117,21 +119,35 @@ class InvitationKey(models.Model):
         """
         return self.uses_left > 0 and not self.key_expired()
     
+    def _expiry_date(self):
+        # Assumes the duration is positive
+        assert self.duration > -1
+        expiration_duration = self.duration or settings.ACCOUNT_INVITATION_DAYS
+        expiration_date = datetime.timedelta(days=expiration_duration)
+        return self.date_invited + expiration_date
+    
     def key_expired(self):
         """
         Determine whether this ``InvitationKey`` has expired, returning 
         a boolean -- ``True`` if the key has expired.
         
-        The date the key has been created is incremented by the number of days 
-        specified in the setting ``ACCOUNT_INVITATION_DAYS`` (which should be 
+        The date the key has been created is incremented by the number of days
+        specified in the setting ``ACCOUNT_INVITATION_DAYS`` (which should be
         the number of days after invite during which a user is allowed to
-        create their account); if the result is less than or equal to the 
+        create their account); if the result is less than or equal to the
         current date, the key has expired and this method returns ``True``.
-        
+
         """
-        expiration_date = datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS)
-        return self.date_invited + expiration_date <= now()
+        if self.duration < 0:
+            return False
+        return self._expiry_date() <= now()
     key_expired.boolean = True
+    
+    def expiry_date(self):
+        if self.duration < 0:
+            return _('never')
+        return self._expiry_date().strftime('%d %b %Y %H:%M')
+    expiry_date.short_description = _('Expiry date')
     
     def mark_used(self, registrant):
         """

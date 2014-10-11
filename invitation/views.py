@@ -13,7 +13,7 @@ from django.template import RequestContext
 if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
     from allauth.socialaccount.views import signup as allauth_signup
     from allauth.socialaccount.forms import SignupForm as RegistrationForm
-    registration_template = 'accounts/signup.html'
+    registration_template = 'account/signup.html'
     
     def registration_register(request, backend, success_url, form_class, disallowed_url, template_name, extra_context):
         return allauth_signup(request, template_name=template_name)
@@ -24,7 +24,6 @@ else:
 
 from invitation.models import InvitationKey
 from invitation.forms import InvitationKeyForm
-from invitation.backends import InvitationBackend
 
 is_key_valid = InvitationKey.objects.is_key_valid
 get_key = InvitationKey.objects.get_key
@@ -33,21 +32,32 @@ remaining_invitations_for_user = InvitationKey.objects.remaining_invitations_for
 def invited(request, invitation_key=None, invitation_recipient=None, extra_context=None):
     if getattr(settings, 'INVITE_MODE', False):
         extra_context = extra_context is not None and extra_context.copy() or {}
-        template_name = 'invitation/wrong_invitation_key.html'
-        if invitation_key:
-            extra_context.update({'invitation_key': invitation_key})
-            valid_key_obj = is_key_valid(invitation_key)
-            if valid_key_obj:
-                template_name = 'invitation/invited.html'
-                invitation_recipient = valid_key_obj.recipient or invitation_recipient
-                #convert any old invitation email to new format
-                if not isinstance(invitation_recipient, tuple):
-                    invitation_recipient = (invitation_recipient, None, None)
-                extra_context.update({'invitation_recipient': invitation_recipient})
-                request.session['invitation_key'] = valid_key_obj
-                request.session['invitation_recipient'] = invitation_recipient
-                request.session['invitation_context'] = extra_context or {}
-
+        valid_key_obj = is_key_valid(invitation_key)
+        if invitation_key and valid_key_obj:
+            template_name = 'invitation/invited.html'
+        else:
+            if invitation_key:
+                extra_context.update({'invitation_key': invitation_key})
+                ik = get_key(invitation_key)
+                if ik:
+                    if ik.key_expired():
+                        extra_context.update({'expired_key': True})
+                    else:
+                        assert ik.uses_left == 0
+                        extra_context.update({'no_uses_left_key', True})
+                else:
+                    extra_context.update({'invalid_key', True})
+            else:
+                extra_context.update({'no_key': True})
+            template_name = 'invitation/wrong_invitation_key.html'
+                
+        if valid_key_obj:
+            invitation_recipient = valid_key_obj.recipient or invitation_recipient
+            extra_context.update({'invitation_recipient': invitation_recipient})
+            request.session['invitation_key'] = valid_key_obj
+            request.session['invitation_recipient'] = invitation_recipient
+            request.session['invitation_context'] = extra_context or {}
+                
         return render(request, template_name, extra_context)
     else:
         return HttpResponseRedirect(reverse('registration_register'))

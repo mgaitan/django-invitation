@@ -6,7 +6,6 @@ from django.conf import settings
 from django.utils.http import int_to_base36
 from hashlib import sha1 as sha_constructor
 from django.utils.translation import ugettext_lazy as _
-from django.contrib.auth.models import User
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.contrib.sites.models import Site
@@ -24,7 +23,6 @@ from django.core.files.temp import NamedTemporaryFile
 from django.core.files import File
 from urlparse import urlparse, urlunparse
 from django.db import connection
-
 
 if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
     import re
@@ -67,10 +65,10 @@ class InvitationKeyManager(models.Manager):
         Create an ``InvitationKey`` and returns it.
         
         The key for the ``InvitationKey`` will be a SHA1 hash, generated 
-        from a combination of the ``User``'s username and a random salt.
+        from a combination of the ``User``'s get_username() and a random salt. TODO:change when updated ot py3
         """
         salt = sha_constructor(str(random.random())).hexdigest()[:5]
-        key = sha_constructor("%s%s%s" % (datetime.datetime.now(), salt, user.username)).hexdigest()
+        key = sha_constructor("%s%s%s" % (datetime.datetime.now(), salt, user.get_username())).hexdigest()
         if not save:
             return InvitationKey(from_user=user, key='previewkey00000000', recipient=recipient, date_invited=datetime.datetime.now())
         return self.create(from_user=user, key=key, recipient=recipient)
@@ -98,9 +96,9 @@ class InvitationKey(models.Model):
     key = models.CharField(_('invitation key'), max_length=40, db_index=True)
     date_invited = models.DateTimeField(_('date invited'), 
                                         auto_now_add=True)
-    from_user = models.ForeignKey(User, 
+    from_user = models.ForeignKey(settings.AUTH_USER_MODEL, 
                                   related_name='invitations_sent')
-    registrant = models.ManyToManyField(User, null=True, blank=True, 
+    registrant = models.ManyToManyField(settings.AUTH_USER_MODEL, null=True, blank=True, 
                                   related_name='invitations_used')
     uses_left = models.IntegerField(default=1)
     
@@ -111,7 +109,7 @@ class InvitationKey(models.Model):
     recipient = PickledObjectField(default=None, null=True)
     
     def __unicode__(self):
-        return u"Invitation from %s on %s (%s)" % (self.from_user.username, self.date_invited, self.key)
+        return u"Invitation from %s on %s (%s)" % (self.from_user.get_username(), self.date_invited, self.key)
     
     def is_usable(self):
         """
@@ -235,11 +233,11 @@ class InvitationKey(models.Model):
         return token_html
         
 class InvitationUser(models.Model):
-    inviter = models.ForeignKey(User, unique=True)
+    inviter = models.ForeignKey(settings.AUTH_USER_MODEL, unique=True)
     invitations_remaining = models.IntegerField()
 
     def __unicode__(self):
-        return u"InvitationUser for %s" % self.inviter.username
+        return u"InvitationUser for %s" % self.inviter.get_username()
 
     
 def user_post_save(sender, instance, created, **kwargs):
@@ -254,7 +252,7 @@ def user_post_save(sender, instance, created, **kwargs):
         except:
             connection.close()
 
-models.signals.post_save.connect(user_post_save, sender=User)
+models.signals.post_save.connect(user_post_save, sender=settings.AUTH_USER_MODEL)
 
 def invitation_key_post_save(sender, instance, created, **kwargs):
     """Decrement invitations_remaining when InvitationKey is created."""

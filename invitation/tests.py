@@ -20,14 +20,18 @@ import datetime
 import sha
 
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.core import mail
 from django.core import management
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.contrib.sites.models import Site
 
-
+try:
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+except ImportError: #django < 1.5
+    from django.contrib.auth.models import User
+    
 from invitation import forms
 from invitation.models import InvitationKey, InvitationUser
 

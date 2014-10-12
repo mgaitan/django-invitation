@@ -10,7 +10,7 @@ admin.autodiscover()
 # Change URLs given the INVITE_MODE setting, useful for tests
 if getattr(settings, 'INVITE_MODE', False):
     urlpatterns = patterns('',
-        url(r'^accounts/register/$',    register,
+        url(r'^accounts/register/$', register,
                                             {
                                                 'form_class': RegistrationFormTermsOfService,
                                                 'backend': 'invitation.backends.InvitationBackend',
@@ -19,7 +19,7 @@ if getattr(settings, 'INVITE_MODE', False):
     )
 else:
     urlpatterns = patterns('',
-        url(r'^accounts/register/$',    register,
+        url(r'^accounts/register/$', register,
                                             {
                                                 'form_class': RegistrationFormTermsOfService,
                                                 'backend': 'registration.backends.default.DefaultBackend',
@@ -28,8 +28,8 @@ else:
     )
 
 urlpatterns += patterns('',
-    url(r'^accounts/',              include('invitation.urls')),
-    url(r'^accounts/',              include('registration.urls')),
-    url(r'^admin/',                 include(admin.site.urls)),
-    
+    url(r'^accounts/', include('invitation.urls')),
+    url(r'^accounts/', include('registration.urls')),
+    url(r'^admin/', include(admin.site.urls)),
+
 )

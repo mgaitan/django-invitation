@@ -79,8 +79,8 @@ class InvitationKeyManager(models.Manager):
         """
         invitation_user, created = InvitationUser.objects.get_or_create(
             inviter=user,
-            defaults={'invitations_remaining': settings.INVITATIONS_PER_USER})
-        return invitation_user.invitations_remaining
+            defaults={'invitations_allocated': settings.INVITATIONS_PER_USER})
+        return invitation_user.invites_remaining()
 
     def delete_expired_keys(self):
         for key in self.all():
@@ -163,6 +163,7 @@ class InvitationKey(models.Model):
         if token_generator:
             token_generator.handle_invitation_used(self)
         invite_accepted.send(sender=InvitationKey, invite_key=self)
+        self.from_user.invitationuser.increment_accepted()
         self.save()
     
     def get_context(self, extra_context={}):
@@ -253,7 +254,7 @@ def user_post_save(sender, instance, created, **kwargs):
     if created:
         invitation_user = InvitationUser()
         invitation_user.inviter = instance
-        invitation_user.invitations_remaining = settings.INVITATIONS_PER_USER
+        invitation_user.invitations_allocated = settings.INVITATIONS_PER_USER
         # prevent error on syncdb when superuser is created
         try:
             invitation_user.save()
@@ -262,13 +263,13 @@ def user_post_save(sender, instance, created, **kwargs):
 
 models.signals.post_save.connect(user_post_save, sender=settings.AUTH_USER_MODEL)
 
-def invitation_key_post_save(sender, instance, created, **kwargs):
-    """Decrement invitations_remaining when InvitationKey is created."""
-    if created:
-        invitation_user = InvitationUser.objects.get(inviter=instance.from_user)
-        remaining = invitation_user.invitations_remaining
-        invitation_user.invitations_remaining = remaining-1
-        invitation_user.save()
+# def invitation_key_post_save(sender, instance, created, **kwargs):
+#     """Decrement invitations_remaining when InvitationKey is created."""
+#     if created:
+#         invitation_user = InvitationUser.objects.get(inviter=instance.from_user)
+#         remaining = invitation_user.invitations_remaining
+#         invitation_user.invitations_remaining = remaining-1
+#         invitation_user.save()
 
 models.signals.post_save.connect(invitation_key_post_save, sender=InvitationKey)
 

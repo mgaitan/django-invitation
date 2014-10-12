@@ -2,7 +2,7 @@ from django.contrib import admin
 from invitation.models import InvitationKey, InvitationUser
 
 class InvitationKeyAdmin(admin.ModelAdmin):
-    list_display = ('__unicode__', 'from_user', 'recipient', 'date_invited', 'uses_left', 'key_expired', 'expiry_date' )
+    list_display = ('__str__', 'from_user', 'recipient', 'date_invited', 'uses_left', 'key_expired', 'expiry_date' )
     filter_horizontal = ('registrant',)
     readonly_fields = ('registrant',)
 

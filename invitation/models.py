@@ -77,7 +77,7 @@ class InvitationKeyManager(models.Manager):
         """
         Return the number of remaining invitations for a given ``User``.
         """
-        invitation_user, created = InvitationUser.objects.get_or_create(
+        invitation_user, _ = InvitationUser.objects.get_or_create(
             inviter=user,
             defaults={'invitations_allocated': settings.INVITATIONS_PER_USER})
         return invitation_user.invites_remaining()
@@ -115,8 +115,8 @@ class InvitationKey(models.Model):
     recipient_phone_number = PhoneNumberField(default="", blank=True)
     recipient_other = models.CharField(max_length=255, default="", blank=True)
     
-    def __unicode__(self):
-        return u"Invitation from %s on %s (%s)" % (self.from_user.get_username(), self.date_invited, self.key)
+    def __str__(self):
+        return "Invitation from %s on %s (%s)" % (self.from_user.get_username(), self.date_invited, self.key)
     
     def is_usable(self):
         """
@@ -204,8 +204,8 @@ class InvitationUser(models.Model):
     invites_allocated = models.IntegerField(default=settings.INVITATIONS_PER_USER)
     invites_accepted = models.IntegerField(default=0)
 
-    def __unicode__(self):
-        return u"InvitationUser for %s" % self.inviter.get_username()
+    def __str__(self):
+        return "InvitationUser for %s" % self.inviter.get_username()
 
     def increment_accepted(self):
         self.invites_accepted +=1
@@ -220,8 +220,8 @@ class InvitationUser(models.Model):
     
     @classmethod
     def add_invites(cls, num_invites):
-        for user in get_user_model().objects.all()
-        cls.add_invites(user, num_invites)
+        for user in get_user_model().objects.all():
+            cls.add_invites(user, num_invites)
     
     @classmethod
     def topoff_user(cls, user, num_invites):
@@ -271,7 +271,7 @@ models.signals.post_save.connect(user_post_save, sender=settings.AUTH_USER_MODEL
 #         invitation_user.invitations_remaining = remaining-1
 #         invitation_user.save()
 
-models.signals.post_save.connect(invitation_key_post_save, sender=InvitationKey)
+#models.signals.post_save.connect(invitation_key_post_save, sender=InvitationKey)
 
 def invitation_key_pre_delete(sender, instance, **kwargs):
     if token_generator:

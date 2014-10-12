@@ -1,6 +1,7 @@
 import datetime
 from django.db import models
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.utils.translation import ugettext_lazy as _
 from django.utils.timezone import now
 from django.core.urlresolvers import reverse
@@ -198,12 +199,54 @@ class InvitationKey(models.Model):
         
         
 class InvitationUser(models.Model):
-    inviter = models.ForeignKey(settings.AUTH_USER_MODEL, unique=True)
-    invitations_remaining = models.IntegerField()
+    inviter = models.OneToOneField(settings.AUTH_USER_MODEL, unique=True)
+    invites_allocated = models.IntegerField(default=settings.INVITATIONS_PER_USER)
+    invites_accepted = models.IntegerField(default=0)
 
     def __unicode__(self):
         return u"InvitationUser for %s" % self.inviter.get_username()
 
+    def increment_accepted(self):
+        self.invites_accepted +=1
+        self.save()
+    
+    @classmethod
+    def add_invites_to_user(cls, user, num_invites):
+        invite_user, _ = InvitationUser.objects.get_or_create(user=user)
+        if invite_user.invites_allocated != -1:
+            invite_user.invites_allocated += num_invites
+            invite_user.save()
+    
+    @classmethod
+    def add_invites(cls, num_invites):
+        for user in get_user_model().objects.all()
+        cls.add_invites(user, num_invites)
+    
+    @classmethod
+    def topoff_user(cls, user, num_invites):
+        "Makes sure user has a certain number of invites"
+        invite_user, _ = cls.objects.get_or_create(user=user)
+        remaining = invite_user.invites_remaining()
+        if remaining != -1 and remaining < num_invites:
+            invite_user.invites_allocated += (num_invites - remaining)
+            invite_user.save()
+
+    @classmethod
+    def topoff(cls, num_invites):
+        "Makes sure all users have a certain number of invites"
+        for user in get_user_model().objects.all():
+            cls.topoff_user(user, num_invites)
+
+    def invites_remaining(self):
+        if self.invites_allocated == -1:
+            return -1
+        return self.invites_allocated - self.inviter.invitations_sent.count()
+
+    def can_send(self):
+        if self.invites_allocated == -1:
+            return True
+        return self.invites_allocated > self.inviter.invitations_sent.count()
+    can_send.boolean = True
     
 def user_post_save(sender, instance, created, **kwargs):
     """Create InvitationUser for user when User is created."""

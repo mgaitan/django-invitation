@@ -24,29 +24,30 @@ class BaseRegistrationBackend():
     a custom backend, inherit from this class and implement the methods
     """
         
+    template = None
+    backend = None
+     
     def get_backend(self):
-        raise NotImplementedError( "Create a subclass and implement this method" )
+        return self.backend
     
     def get_registration_form(self):
         raise NotImplementedError( "Create a subclass and implement this method" )
     
     def get_registration_template(self):
-        raise NotImplementedError( "Create a subclass and implement this method" )
+        return self.template
     
     def get_registration_view(self):
         raise NotImplementedError( "Create a subclass and implement this method" )
 
 
 class RegistrationBackend(BaseRegistrationBackend):
-    def get_backend(self):
-        return 'registration.backends.default.DefaultBackend'
+    
+    template = 'registration/registration_form.html'
+    backend = 'registration.backends.default.DefaultBackend'
     
     def get_registration_form(self):
         from registration.forms import RegistrationForm
         return RegistrationForm
-    
-    def get_registration_template(self):
-        return 'registration/registration_form.html'
     
     def get_registration_view(self):
         from registration.views import register
@@ -54,15 +55,13 @@ class RegistrationBackend(BaseRegistrationBackend):
     
     
 class AllAuthRegistrationBackend(RegistrationBackend):
-    def get_backend(self):
-        return 'allauth.account.auth_backends.AuthenticationBackend'
+    
+    template = 'account/signup.html'
+    backend = 'allauth.account.auth_backends.AuthenticationBackend'
     
     def get_registration_form(self):
         from allauth.socialaccount.forms import SignupForm
         return SignupForm
-    
-    def get_registration_template(self):
-        return 'account/signup.html'
     
     def get_registration_view(self):
         from allauth.socialaccount.views import signup as allauth_signup

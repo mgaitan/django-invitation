@@ -10,7 +10,7 @@ Forked from https://github.com/lizrice/django-invitation which is forked from ht
 
 V1.1
 ----
-***recipiant added to model (email field):***  
+***recipient added to model (email field):***  
 -This allows us to track recipients. For example we may want to email all recipients a few days prior to expiration.  
 -It also allows us to pre-populate form data with the recipient email address and validate it.  
 -Compatable with null values.  

@@ -122,7 +122,7 @@ def invite(request, success_url=None,
     else:
         form = form_class()
     invitation = InvitationKey.objects.create_invitation(request.user, save=False)
-    preview_context = invitation.get_context('--your note will be inserted here--')
+    preview_context = invitation.get_context({'sender_note': _('--your note will be inserted here--')})
     extra_context.update({
             'form': form,
             'remaining_invitations': remaining_invitations,
@@ -147,14 +147,14 @@ def send_bulk_invitations(request, success_url=None):
                         invitation.send_to(from_email, mark_safe(sender_note))
                     except:
                         messages.error(request, "Mail to %s failed" % recipient[0])
-            messages.success(request, "Mail sent successfully")
+            messages.success(request, _("Mail sent successfully"))
             return HttpResponseRedirect(success_url or reverse('invitation_invite_bulk'))
         else:
-            messages.error(request, 'You did not provied any email addresses.')
+            messages.error(request, _('You did not provide any email addresses.'))
             return HttpResponseRedirect(reverse('invitation_invite_bulk'))
     else:
         invitation = InvitationKey.objects.create_invitation(request.user, save=False)
-        preview_context = invitation.get_context('--your note will be inserted here--')
+        preview_context = invitation.get_context({'sender_note': _('--your note will be inserted here--')})
         
         context = {
             'title': "Send Bulk Invitations",

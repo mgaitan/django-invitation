@@ -30,19 +30,19 @@ class DefaultInvitationKeyForm(BaseInvitationKeyForm):
         
         if 'email' in self.cleaned_data:
             if self.user.email == self.cleaned_data['email']:
-                self._errors['email'] = self.error_class([u"You can't send an invitation to yourself"])
+                self._errors['email'] = self.error_class([_("You can't send an invitation to yourself")])
                 del cleaned_data['email']
             
         if 'email' in self.cleaned_data:    
             for email_match in self.invitation_blacklist:
                 if re.search(email_match, self.cleaned_data['email']) is not None:
-                    self._errors['email'] = self.error_class([u"Thanks, but there's no need to invite us!"])
+                    self._errors['email'] = self.error_class([_("Thanks, but there's no need to invite us!")])
                     del cleaned_data['email']
                     break
 
         if 'sender_note' in self.cleaned_data:
             if not self.user.is_staff and len(cleaned_data['sender_note']) > 500:
-                self._errors['sender_note'] = self.error_class([u"Your note must be less than 500 characters"])
+                self._errors['sender_note'] = self.error_class([_("Your note must be less than 500 characters")])
         
 class NamedInvitationKeyForm(DefaultInvitationKeyForm):
     first_name = forms.CharField(max_length=20)

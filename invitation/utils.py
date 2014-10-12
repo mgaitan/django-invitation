@@ -105,7 +105,7 @@ class DefaultTokenGenerator(BaseTokenGenerator):
         exp_text = expiration_date.strftime("%x")
         stamp(image, exp_text, 18)
         
-        #stamp recipiant name
+        #stamp recipient name
         if instance.recipient[1]:
             offset = stamp(image, instance.recipient[1], -16)
         if instance.recipient[2]:

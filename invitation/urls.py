@@ -2,13 +2,19 @@ from django.conf import settings
 from django.conf.urls import *
 from django.views.generic import TemplateView
 
+from invitation import utils
 
-if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
-    from allauth.account.forms import BaseSignupForm as RegistrationFormTermsOfService
-    reg_backend = 'allauth.account.auth_backends.AuthenticationBackend'
-else:
-    from registration.forms import RegistrationFormTermsOfService
-    reg_backend = 'registration.backends.default.DefaultBackend'
+reg_backend_class = utils.get_backend_class()
+reg_backend = reg_backend_class().get_backend()
+
+# if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
+    #TODO: delete when sure not needed
+    #from allauth.account.forms import BaseSignupForm as RegistrationFormTermsOfService
+#     reg_backend = 'allauth.account.auth_backends.AuthenticationBackend'
+# else:
+    #TODO: delete when sure not needed
+    #from registration.forms import RegistrationFormTermsOfService
+#     reg_backend = 'registration.backends.default.DefaultBackend'
     
 from invitation.views import invite, invited, register, send_bulk_invitations, token
 
@@ -30,7 +36,7 @@ urlpatterns = patterns('',
             register,
             { 'backend': reg_backend },
             name='registration_register'),
-    url(r'^token/(?P<key>\w+)/$', 
-            token,
-            name='invitation_token'),
 )
+
+if getattr(settings, 'INVITATION_USE_TOKEN', False):
+    urlpatterns += url(r'^token/(?P<key>\w+)/$', token, name='invitation_token'),

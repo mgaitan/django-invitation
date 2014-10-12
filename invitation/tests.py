@@ -35,11 +35,15 @@ except ImportError: #django < 1.5
     
 from invitation import forms
 from invitation.models import InvitationKey, InvitationUser
+from invitation.backends import (RegistrationBackend, AllAuthRegistrationBackend)
+
+registration_backends = []
 
 allauth_installed = False 
 try:
     if 'allauth' in settings.INSTALLED_APPS:
         allauth_installed = True
+        registration_backends += AllAuthRegistrationBackend
         print "** allauth installed **"    
     from allauth.socialaccount.models import SocialApp
 except:
@@ -47,9 +51,9 @@ except:
 
 registration_installed = False    
 try: 
-    import registration
     if 'registration' in settings.INSTALLED_APPS:
         registration_installed = True
+        registration_backends += RegistrationBackend
         print "** registration installed **"    
 except:
     pass        

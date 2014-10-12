@@ -110,8 +110,9 @@ def invite(request, success_url=None,
                           user=request.user)
         if form.is_valid():
             delivery_backend_class = utils.get_delivery_backend_class()
-            delivery_backend = delivery_backend_class(request.user, form)
-            delivery_backend.deliver()
+            delivery_backend = delivery_backend_class(form)
+            invite = delivery_backend.create_invitation(request.user)
+            invite.send_to(delivery_backend)
             
             # success_url needs to be dynamically generated here; setting a
             # a default value using reverse() will cause circular-import

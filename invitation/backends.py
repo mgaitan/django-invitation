@@ -94,28 +94,28 @@ class InvitationBackend(InvitationMixin, DefaultBackend):
 
 class BaseDeliveryBackend():
     
-    def __init__(self, user, form):
+    def __init__(self, form):
         self.form = form
-        self.user = user
-        
-    def deliver(self):
-        recipient_dict = self.get_recipient_dict()
-        invitation = self.create_invitation(self.user, recipient_dict)
-        context = invitation.get_context(self.get_extra_context())
-        self.send_invitation(context)
-        
+
     def get_recipient_dict(self):
         raise NotImplementedError( "Create a subclass and implement this method" )
     
-    def create_invitation(self, user, recipient_dict):
+    def create_invitation(self, user):
+        recipient_dict = self.get_recipient_dict()
         return InvitationKey.objects.create_invitation(user, recipient_dict)
     
     def send_invitation(self, context):
+        c = {}
+        c.update(context)
+        c.update(self.get_extra_context())
+        self._send_invitation(c)
+    
+    def _send_invitation(self, context):
         raise NotImplementedError( "Create a subclass and implement this method" )
     
     def get_extra_context(self):
         raise NotImplementedError( "Create a subclass and implement this method" )
-    
+
 
 class EmailDeliveryBackend(BaseDeliveryBackend):
     subject_template = 'invitation/invitation_email_subject.txt'
@@ -128,7 +128,7 @@ class EmailDeliveryBackend(BaseDeliveryBackend):
     def get_extra_context(self):
         return {'sender_note': self.form.cleaned_data.get("sender_note")}
     
-    def send_invitation(self, context):
+    def _send_invitation(self, context):
         subject = render_to_string(self.subject_template, context)
         # Email subject *must not* contain newlines
         subject = ''.join(subject.splitlines())

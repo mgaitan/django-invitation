@@ -9,6 +9,8 @@ from django.db import connection
 from phonenumber_field.modelfields import PhoneNumberField
 
 from invitation import utils
+from invitation.signals import (invite_invited, invite_accepted, 
+                                invite_joined_independently) 
 
 #TODO: delete once we're sure it's not needed
 # if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
@@ -159,6 +161,7 @@ class InvitationKey(models.Model):
         self.registrant.add(registrant)
         if token_generator:
             token_generator.handle_invitation_used(self)
+        invite_accepted.send(sender=InvitationKey, invite_key=self)
         self.save()
     
     def get_context(self, extra_context={}):
@@ -181,6 +184,11 @@ class InvitationKey(models.Model):
         context.update(extra_context)
         return context
     
+    def send_to(self, delivery_backend):
+        context = self.get_context()
+        delivery_backend.send_invitation(context)
+        invite_invited.send(sender=InvitationKey, invite_key=self)
+        
     def generate_token(self, invitation_url):
         if token_generator:
             return token_generator.generate_token(self, invitation_url)

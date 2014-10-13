@@ -10,9 +10,8 @@ from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
 
-from invitation import utils
+from invitation import utils, models
 from invitation.models import InvitationKey
-
 
 reg_backend_class = utils.get_registration_backend_class()
 reg_backend = reg_backend_class()
@@ -20,31 +19,21 @@ RegistrationForm = reg_backend.get_registration_form()
 registration_template = reg_backend.get_registration_template()
 registration_register = reg_backend.get_registration_view()
 
-# TODO: delete when sure don't need
-# if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
-#     from allauth.socialaccount.views import signup as allauth_signup
-#     from allauth.socialaccount.forms import SignupForm as RegistrationForm
-#     registration_template = 'account/signup.html'
-#
-#     def registration_register(request, backend, success_url, form_class,
-#        disallowed_url, template_name, extra_context):
-#         return allauth_signup(request, template_name=template_name)
-# else:
-#     from registration.views import register as registration_register
-#     from registration.forms import RegistrationForm
-#     registration_template = 'registration/registration_form.html'
-
 InvitationKeyForm = utils.get_invitation_form()
 
 is_key_valid = InvitationKey.objects.is_key_valid
 get_key = InvitationKey.objects.get_key
-remaining_invitations_for_user = InvitationKey.objects.remaining_invitations_for_user
+objs = InvitationKey.objects
+remaining_invitations_for_user = objs.remaining_invitations_for_user
 
 
-def invited(request, invitation_key=None, invitation_recipient=None,
+def invited(request, invitation_key=None, invite_recipient=None,
             extra_context=None):
     if getattr(settings, 'INVITE_MODE', False):
-        extra_context = extra_context is not None and extra_context.copy() or {}
+        if extra_context is not None:
+            extra_context = extra_context.copy()
+        else:
+            extra_context = {}
         valid_key_obj = is_key_valid(invitation_key)
         if invitation_key and valid_key_obj:
             template_name = 'invitation/invited.html'
@@ -57,18 +46,18 @@ def invited(request, invitation_key=None, invitation_recipient=None,
                         extra_context.update({'expired_key': True})
                     else:
                         assert ik.uses_left == 0
-                        extra_context.update({'no_uses_left_key', True})
+                        extra_context.update({'no_uses_left_key': True})
                 else:
-                    extra_context.update({'invalid_key', True})
+                    extra_context.update({'invalid_key': True})
             else:
                 extra_context.update({'no_key': True})
             template_name = 'invitation/wrong_invitation_key.html'
 
         if valid_key_obj:
-            invitation_recipient = valid_key_obj.recipient or invitation_recipient
-            extra_context.update({'invitation_recipient': invitation_recipient})
+            invite_recipient = valid_key_obj.recipient() or invite_recipient
+            extra_context.update({'invitation_recipient': invite_recipient})
             request.session['invitation_key'] = valid_key_obj.key
-            request.session['invitation_recipient'] = invitation_recipient
+            request.session['invitation_recipient'] = invite_recipient
             request.session['invitation_context'] = extra_context or {}
 
         return render(request, template_name, extra_context)
@@ -117,7 +106,7 @@ def invite(request, success_url=None,
                           user=request.user)
         if form.is_valid():
             delivery_backend_class = utils.get_delivery_backend_class()
-            delivery_backend = delivery_backend_class(form)
+            delivery_backend = delivery_backend_class(form.cleaned_data)
             invite = delivery_backend.create_invitation(request.user)
             invite.send_to(delivery_backend)
 
@@ -125,11 +114,14 @@ def invite(request, success_url=None,
             # a default value using reverse() will cause circular-import
             # problems with the default URLConf for this application, which
             # imports this file.
-            return HttpResponseRedirect(success_url or reverse('invitation_complete'))
+            success_url = success_url or reverse('invitation_complete')
+            return HttpResponseRedirect(success_url)
     else:
         form = form_class()
-    invitation = InvitationKey.objects.create_invitation(request.user, save=False)
-    preview_context = invitation.get_context({'sender_note': _('--your note will be inserted here--')})
+    objs = InvitationKey.objects
+    invitation = objs.create_invitation(request.user, save=False)
+    note = _('--your note will be inserted here--')
+    preview_context = invitation.get_context({'sender_note': note})
     extra_context.update({
         'form': form,
         'remaining_invitations': remaining_invitations,
@@ -139,38 +131,48 @@ def invite(request, success_url=None,
     return render(request, template_name, extra_context)
 
 
-# TODO: abtract the delivery backend out of this
 @staff_member_required
 def send_bulk_invitations(request, success_url=None):
-    current_site, root_url = utils.get_site(request)
+    #current_site, root_url = utils.get_site(request)
     if request.POST.get('post'):
-        to_emails = [(e.split(',')[0].strip(), e.split(',')[1].strip() or None, e.split(',')[2].strip() or None) if e.find(',') + 1 else (e.strip() or None, None, None) for e in request.POST['to_emails'].split(';')]
-        # to_emails = [(e.split(',')[0],e.split(',')[1]) if e.find(',') else tuple('',e) for e in request.POST['to_emails'].split(';')]
+        to_emails = [(e.split(',')[0].strip(), e.split(',')[1].strip() or None,
+                      e.split(',')[2].strip() or None) if e.find(',') + 1 else
+                     (e.strip() or None, None, None)
+                     for e in request.POST['to_emails'].split(';')]
+
         sender_note = request.POST['sender_note']
         from_email = request.POST['from_email']
         if len(to_emails) > 0 and to_emails[0] != '':
             for recipient in to_emails:
                 if recipient[0]:
-                    invitation = InvitationKey.objects.create_invitation(request.user, recipient)
+                    objs = InvitationKey.objects
+                    invitation = objs.create_invitation(request.user,
+                                                {models.KEY_EMAIL: recipient})
                     try:
                         invitation.send_to(from_email, mark_safe(sender_note))
                     except:
-                        messages.error(request, "Mail to %s failed" % recipient[0])
+                        messages.error(request, "Mail to %s failed" %
+                                       recipient[0])
             messages.success(request, _("Mail sent successfully"))
-            return HttpResponseRedirect(success_url or reverse('invitation_invite_bulk'))
+            success_url = success_url or reverse('invitation_invite_bulk')
+            return HttpResponseRedirect(success_url)
         else:
-            messages.error(request, _('You did not provide any email addresses.'))
+            err = _('You did not provide any email addresses.')
+            messages.error(request, err)
             return HttpResponseRedirect(reverse('invitation_invite_bulk'))
     else:
-        invitation = InvitationKey.objects.create_invitation(request.user, save=False)
-        preview_context = invitation.get_context({'sender_note': _('--your note will be inserted here--')})
+        invitation = InvitationKey.objects.create_invitation(request.user,
+                                                             save=False)
+        note = _('--your note will be inserted here--')
+        preview_context = invitation.get_context({'sender_note': note})
 
+        html_template = 'invitation/invitation_email.html'
+        text_template = 'invitation/invitation_email.txt'
         context = {
             'title': "Send Bulk Invitations",
-            'html_preview': render_to_string('invitation/invitation_email.html', preview_context),
-            'text_preview': render_to_string('invitation/invitation_email.txt', preview_context),
+            'html_preview': render_to_string(html_template, preview_context),
+            'text_preview': render_to_string(text_template, preview_context),
         }
-        # return render(request, 'invitation/invitation_form_bulk.html', context)
         return render_to_response('invitation/invitation_form_bulk.html',
                           context,
                           context_instance=RequestContext(request))

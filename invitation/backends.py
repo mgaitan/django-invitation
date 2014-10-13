@@ -9,9 +9,9 @@ from invitation import (utils, models)
 from invitation.models import InvitationKey
 
 
-reg_backend_class = utils.get_registration_backend_class()
-reg_backend = reg_backend_class()
-DefaultBackend = utils.str_to_class(reg_backend.get_backend())
+reg_backend_str = getattr(settings, 'INVITE_REGISTRATION_BACKEND',
+                       'allauth.account.auth_backends.AuthenticationBackend')
+DefaultBackend = utils.str_to_class(reg_backend_str)
 
 # TODO: delete when sure don't need
 # if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
@@ -66,7 +66,7 @@ class AllAuthRegistrationBackend(RegistrationBackend):
         return SignupForm
 
     def get_registration_view(self):
-        from allauth.socialaccount.views import signup as allauth_signup
+        from allauth.account.views import signup as allauth_signup
 
         def register(request, backend, success_url, form_class, disallowed_url,
                      template_name, extra_context):
@@ -99,8 +99,8 @@ class InvitationBackend(InvitationMixin, DefaultBackend):
 
 class BaseDeliveryBackend():
 
-    def __init__(self, form):
-        self.form = form
+    def __init__(self, data):
+        self.data = data
 
     def get_recipient_dict(self):
         raise NotImplementedError("Create a subclass and implement method")
@@ -128,10 +128,10 @@ class EmailDeliveryBackend(BaseDeliveryBackend):
     text_template = 'invitation/invitation_email.txt'
 
     def get_recipient_dict(self):
-        return {models.KEY_EMAIL, self.form.cleaned_data.get('email')}
+        return {models.KEY_EMAIL: self.data.get('email')}
 
     def get_extra_context(self):
-        return {'sender_note': self.form.cleaned_data.get("sender_note")}
+        return {'sender_note': self.data.get("sender_note", "")}
 
     def _send_invitation(self, context):
         subject = render_to_string(self.subject_template, context)
@@ -142,9 +142,11 @@ class EmailDeliveryBackend(BaseDeliveryBackend):
         note = mark_safe(strip_tags(context.get('sender_note')))
         context.update({'sender_note': note})
         message = render_to_string(self.text_template, context)
+        default_from_email = getattr(settings, 'DEFAULT_FROM_EMAIL',
+                                     'set_DEFAULT_FROM_EMAIL@thissite.com')
         msg = EmailMultiAlternatives(subject, message,
                                      context.get('from_email',
-                                                 settings.DEFAULT_FOM_EMAIL),
+                                                 default_from_email),
                                      [context.get('recipient_email')])
         msg.attach_alternative(message_html, "text/html")
         msg.send()
@@ -155,7 +157,7 @@ class NamedEmailDeliveryBackend(EmailDeliveryBackend):
     def get_recipient_dict(self):
         d = super(NamedEmailDeliveryBackend, self).get_recipient_dict()
         d.update({
-            models.KEY_FNAME, self.form.cleaned_data.get('first_name'),
-            models.KEY_LNAME, self.form.cleaned_data.get('last_name'),
+            models.KEY_FNAME, self.data.get('first_name'),
+            models.KEY_LNAME, self.data.get('last_name'),
         })
         return d

@@ -11,20 +11,20 @@ admin.autodiscover()
 if getattr(settings, 'INVITE_MODE', False):
     urlpatterns = patterns('',
         url(r'^accounts/register/$', register,
-                                            {
-                                                'form_class': RegistrationFormTermsOfService,
-                                                'backend': 'invitation.backends.InvitationBackend',
-                                            },
-                                            name='registration_register'),
+                        {
+                            'form_class': RegistrationFormTermsOfService,
+                            'backend': 'invitation.backends.InvitationBackend',
+                        },
+                        name='registration_register'),
     )
 else:
     urlpatterns = patterns('',
         url(r'^accounts/register/$', register,
-                                            {
-                                                'form_class': RegistrationFormTermsOfService,
-                                                'backend': 'registration.backends.default.DefaultBackend',
-                                            },
-                                            name='registration_register'),
+                {
+                    'form_class': RegistrationFormTermsOfService,
+                    'backend': 'registration.backends.default.DefaultBackend',
+                },
+                name='registration_register'),
     )
 
 urlpatterns += patterns('',

@@ -7,11 +7,8 @@ from django.utils.timezone import now
 from django.core.urlresolvers import reverse
 from django.db import connection
 
-from phonenumber_field.modelfields import PhoneNumberField
-
 from invitation import utils
-from invitation.signals import (invite_invited, invite_accepted,
-                                invite_joined_independently)
+from invitation.signals import (invite_invited, invite_accepted)
 
 # TODO: delete once we're sure it's not needed
 # if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
@@ -121,12 +118,13 @@ class InvitationKey(models.Model):
                                             blank=True)
     recipient_last_name = models.CharField(max_length=24, default="",
                                            blank=True)
-    recipient_phone_number = PhoneNumberField(default="", blank=True)
+    recipient_phone_number = models.CharField(max_length=15, blank=True)
     recipient_other = models.CharField(max_length=255, default="", blank=True)
 
     def __str__(self):
-        return "Invitation from %s on %s (%s)" % (self.from_user.get_username(),
-                                                self.date_invited, self.key)
+        from_user = self.from_user.get_username()
+        return "Invitation from %s on %s (%s)" % (from_user, self.date_invited,
+                                                  self.key)
 
     def is_usable(self):
         """
@@ -181,7 +179,8 @@ class InvitationKey(models.Model):
         invitation_url = root_url + reverse('invitation_invited',
                                             kwargs={'invitation_key': self.key}
                                             )
-        exp_date = self.date_invited + datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS)
+        delta = datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS)
+        exp_date = self.date_invited + delta
         context = {'invitation_key': self,
                     'expiration_days': settings.ACCOUNT_INVITATION_DAYS,
                     'from_user': self.from_user,
@@ -214,10 +213,15 @@ class InvitationKey(models.Model):
                               '</a>'])
         return token_html
 
+    def recipient(self):
+        return self.recipient_email or self.recipient_phone_number or \
+            self.recipient_other or ""
+
 
 class InvitationUser(models.Model):
     inviter = models.OneToOneField(settings.AUTH_USER_MODEL, unique=True)
-    invites_allocated = models.IntegerField(default=settings.INVITATIONS_PER_USER)
+    invites_allocated = \
+        models.IntegerField(default=settings.INVITATIONS_PER_USER)
     invites_accepted = models.IntegerField(default=0)
 
     def __str__(self):
@@ -266,6 +270,7 @@ class InvitationUser(models.Model):
     can_send.boolean = True
 
 
+#TODO: check to see if there is an outstanding invite for this user
 def user_post_save(sender, instance, created, **kwargs):
     """Create InvitationUser for user when User is created."""
     if created:
@@ -278,21 +283,25 @@ def user_post_save(sender, instance, created, **kwargs):
         except:
             connection.close()
 
-models.signals.post_save.connect(user_post_save, sender=settings.AUTH_USER_MODEL)
+models.signals.post_save.connect(user_post_save,
+                                 sender=settings.AUTH_USER_MODEL)
 
 # def invitation_key_post_save(sender, instance, created, **kwargs):
 #     """Decrement invitations_remaining when InvitationKey is created."""
+#    objs = InvitationUser.objects
 #     if created:
-#         invitation_user = InvitationUser.objects.get(inviter=instance.from_user)
+#         invitation_user = objs.get(inviter=instance.from_user)
 #         remaining = invitation_user.invitations_remaining
 #         invitation_user.invitations_remaining = remaining-1
 #         invitation_user.save()
 
-# models.signals.post_save.connect(invitation_key_post_save, sender=InvitationKey)
+# models.signals.post_save.connect(invitation_key_post_save,
+#                                sender=InvitationKey)
 
 
 def invitation_key_pre_delete(sender, instance, **kwargs):
     if token_generator:
         token_generator.handle_invitation_deleted(instance)
 
-models.signals.post_delete.connect(invitation_key_pre_delete, sender=InvitationKey)
+models.signals.post_delete.connect(invitation_key_pre_delete,
+                                   sender=InvitationKey)

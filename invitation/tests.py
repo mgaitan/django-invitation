@@ -26,7 +26,7 @@ from django.core.urlresolvers import reverse
 from django.test import TestCase
 
 from invitation import forms
-from invitation.backends import RegistrationBackend, AllAuthRegistrationBackend
+from invitation.backends import EmailDeliveryBackend
 from invitation.models import InvitationKey, InvitationUser
 
 
@@ -37,13 +37,10 @@ except ImportError:  # django < 1.5
     from django.contrib.auth.models import User
 
 
-registration_backends = []
-
 allauth_installed = False
 try:
     if 'allauth' in settings.INSTALLED_APPS:
         allauth_installed = True
-        registration_backends += AllAuthRegistrationBackend
         print ("** allauth installed **")
     from allauth.socialaccount.models import SocialApp
 except:
@@ -53,7 +50,6 @@ registration_installed = False
 try:
     if 'registration' in settings.INSTALLED_APPS:
         registration_installed = True
-        registration_backends += RegistrationBackend
         print ("** registration installed **")
 except:
     pass
@@ -73,9 +69,11 @@ class InvitationTestCase(TestCase):
         self.sample_user = User.objects.create_user(username='alice',
                                                     password='secret',
                                                     email='alice@example.com')
-        self.sample_key = InvitationKey.objects.create_invitation(user=self.sample_user)
-        self.expired_key = InvitationKey.objects.create_invitation(user=self.sample_user)
-        self.expired_key.date_invited -= datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS + 1)
+        objs = InvitationKey.objects
+        self.sample_key = objs.create_invitation(user=self.sample_user)
+        self.expired_key = objs.create_invitation(user=self.sample_user)
+        d = settings.ACCOUNT_INVITATION_DAYS + 1
+        self.expired_key.date_invited -= datetime.timedelta(days=d)
         self.expired_key.save()
 
         self.sample_registration_data = {
@@ -107,33 +105,47 @@ class InvitationTestCaseRegistration(InvitationTestCase):
 
     def setUp(self):
         super(InvitationTestCaseRegistration, self).setUp()
-        self.saved_invitation_use_allauth = settings.INVITATION_USE_ALLAUTH
-        settings.INVITATION_USE_ALLAUTH = False
-        self.saved_socialaccount_providers = settings.SOCIALACCOUNT_PROVIDERS
+        #self.saved_invitation_use_allauth = settings.INVITATION_USE_ALLAUTH
+        #settings.INVITATION_USE_ALLAUTH = False
+        self.saved_invite_mode = getattr(settings, 'INVITE_MODE', None)
+        settings.INVITE_MODE = True
+        social_accounts = getattr(settings, 'SOCIALACCOUNT_PROVIDERS', None)
+        self.saved_socialaccounts = social_accounts
         settings.SOCIALACCOUNT_PROVIDERS = {}
 
     def tearDown(self):
         super(InvitationTestCaseRegistration, self).tearDown()
-        settings.INVITATION_USE_ALLAUTH = self.saved_invitation_use_allauth
-        settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccount_providers
+        #settings.INVITATION_USE_ALLAUTH = self.saved_invitation_use_allauth
+        if self.saved_invite_mode is not None:
+            settings.INVITE_MODE = self.saved_invite_mode
+        if self.saved_socialaccounts is not None:
+            settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccounts
 
 
 class InvitationTestCaseAllauth(InvitationTestCase):
 
     def setUp(self):
         super(InvitationTestCaseAllauth, self).setUp()
-        self.saved_invitation_use_allauth = settings.INVITATION_USE_ALLAUTH
-        settings.INVITATION_USE_ALLAUTH = True
-        self.saved_socialaccount_providers = settings.SOCIALACCOUNT_PROVIDERS
+#         self.saved_invitation_use_allauth = settings.INVITATION_USE_ALLAUTH
+#         settings.INVITATION_USE_ALLAUTH = True
+        self.saved_invite_mode = getattr(settings, 'INVITE_MODE', None)
+        settings.INVITE_MODE = True
+        social_accounts = getattr(settings, 'SOCIALACCOUNT_PROVIDERS', None)
+        self.saved_socialaccounts = social_accounts
         settings.SOCIALACCOUNT_PROVIDERS = {}
 
-        self.facebook_app = SocialApp(site=Site.objects.get_current(), provider='facebook', name='test', key='abc', secret='def')
+        self.facebook_app = SocialApp(provider='facebook', name='test',
+                                      key='abc', secret='def')
         self.facebook_app.save()
+        self.facebook_app.sites.add(Site.objects.get_current())
 
     def tearDown(self):
         super(InvitationTestCaseAllauth, self).tearDown()
-        settings.INVITATION_USE_ALLAUTH = self.saved_invitation_use_allauth
-        settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccount_providers
+#         settings.INVITATION_USE_ALLAUTH = self.saved_invitation_use_allauth
+        if self.saved_invite_mode is not None:
+            settings.INVITE_MODE = self.saved_invite_mode
+        if self.saved_socialaccounts is not None:
+            settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccounts
 
 
 class InvitationModelTests(InvitationTestCase):
@@ -153,7 +165,8 @@ class InvitationModelTests(InvitationTestCase):
         Test that ``InvitationKey.send_to`` sends an invitation email.
 
         """
-        self.sample_key.send_to('bob@example.com')
+        delivery = EmailDeliveryBackend({'recipient_email': 'bob@example.com'})
+        self.sample_key.send_to(delivery)
         self.assertEqual(len(mail.outbox), 1)
 
     def test_key_expiration_condition(self):
@@ -163,10 +176,10 @@ class InvitationModelTests(InvitationTestCase):
 
         """
         # Unexpired user returns False.
-        self.failIf(self.sample_key.key_expired())
+        self.assertFalse(self.sample_key.key_expired())
 
         # Expired user returns True.
-        self.failUnless(self.expired_key.key_expired())
+        self.assertTrue(self.expired_key.key_expired())
 
     def test_expired_user_deletion(self):
         """
@@ -189,13 +202,15 @@ class InvitationModelTests(InvitationTestCase):
 
     def test_invitations_remaining(self):
         """Test InvitationUser calculates remaining invitations properly."""
-        remaining_invites = InvitationKey.objects.remaining_invitations_for_user
+        objs = InvitationKey.objects
+        remaining_invites = objs.remaining_invitations_for_user
 
         # New user starts with settings.INVITATIONS_PER_USER
         user = User.objects.create_user(username='newbie',
                                         password='secret',
                                         email='newbie@example.com')
-        self.assertEqual(remaining_invites(user), settings.INVITATIONS_PER_USER)
+        self.assertEqual(remaining_invites(user),
+                         settings.INVITATIONS_PER_USER)
 
         # After using some, amount remaining is decreased
         used = InvitationKey.objects.filter(from_user=self.sample_user).count()
@@ -203,22 +218,24 @@ class InvitationModelTests(InvitationTestCase):
         remaining = remaining_invites(self.sample_user)
         self.assertEqual(remaining, expected_remaining)
 
-        # Using Invitationuser via Admin, remaining can be increased
+        # Using InvitationUser via Admin, remaining can be increased
         invitation_user = InvitationUser.objects.get(inviter=self.sample_user)
-        new_remaining = 2 * settings.INVITATIONS_PER_USER + 1
-        invitation_user.invitations_remaining = new_remaining
+        newly_allocated = 2 * settings.INVITATIONS_PER_USER + 1
+        invitation_user.invites_allocated += newly_allocated
         invitation_user.save()
         remaining = remaining_invites(self.sample_user)
-        self.assertEqual(remaining, new_remaining)
+        self.assertEqual(remaining, expected_remaining + newly_allocated)
 
         # If no InvitationUser (for pre-existing/legacy User), one is created
         old_sample_user = User.objects.create_user(username='lewis',
                                                    password='secret',
                                                    email='lewis@example.com')
-        old_sample_user.invitationuser_set.all().delete()
-        self.assertEqual(old_sample_user.invitationuser_set.count(), 0)
+
+        self.assertTrue(old_sample_user.invitationuser is not None)
         remaining = remaining_invites(old_sample_user)
         self.assertEqual(remaining, settings.INVITATIONS_PER_USER)
+
+        old_sample_user.invitationuser.delete()
 
 
 class InvitationFormTests(InvitationTestCase):
@@ -229,11 +246,13 @@ class InvitationFormTests(InvitationTestCase):
     """
     def setUp(self):
         super(InvitationFormTests, self).setUp()
-        self.saved_invitation_blacklist = settings.INVITATION_BLACKLIST
+        self.saved_invitation_blacklist = getattr(settings,
+                                                  'INVITATION_BLACKLIST', None)
         settings.INVITATION_BLACKLIST = ('@mydomain.com',)
 
     def tearDown(self):
-        settings.INVITATION_BLACKLIST = self.saved_invitation_blacklist
+        if self.saved_invitation_blacklist is not None:
+            settings.INVITATION_BLACKLIST = self.saved_invitation_blacklist
         super(InvitationFormTests, self).tearDown()
 
     def test_invalid_invitation_form(self):
@@ -245,7 +264,7 @@ class InvitationFormTests(InvitationTestCase):
             # Invalid email.
             {
             'data': {'email': 'example.com'},
-            'error': ('email', ["Enter a valid e-mail address."])
+            'error': ('email', ["Enter a valid email address."])
             },
             {
              'data': {'email': 'an_address@mydomain.com'},
@@ -254,19 +273,26 @@ class InvitationFormTests(InvitationTestCase):
             ]
 
         for invalid_dict in invalid_data_dicts:
-            form = forms.InvitationKeyForm(data=invalid_dict['data'], remaining_invitations=1)
-            self.failIf(form.is_valid())
-            self.assertEqual(form.errors[invalid_dict['error'][0]], invalid_dict['error'][1])
+            form = forms.DefaultInvitationKeyForm(data=invalid_dict['data'],
+                                           remaining_invitations=1,
+                                           user=self.sample_user)
+            self.assertFalse(form.is_valid())
+            self.assertEqual(form.errors[invalid_dict['error'][0]],
+                             invalid_dict['error'][1])
 
     def test_invitation_form(self):
-        form = forms.InvitationKeyForm(data={'email': 'foo@example.com'}, remaining_invitations=1)
-        print form.errors
-        self.failUnless(form.is_valid())
+        form = \
+            forms.DefaultInvitationKeyForm(data={'email': 'foo@example.com'},
+                                       remaining_invitations=1,
+                                       user=self.sample_user)
+        print (form.errors)
+        self.assertTrue(form.is_valid())
 
 
 class InvitationViewTestsRegistration(InvitationTestCaseRegistration):
     """
-    Tests for the views included in django-invitation when django-registration is used as the backend.
+    Tests for the views included in django-invitation when django-registration
+    is used as the backend.
 
     """
 
@@ -277,33 +303,36 @@ class InvitationViewTestsRegistration(InvitationTestCaseRegistration):
 
         """
         # You need to be logged in to send an invite.
-        response = self.client.login(username='alice', password='secret')
-        remaining_invitations = InvitationKey.objects.remaining_invitations_for_user(self.sample_user)
+        _ = self.client.login(username='alice', password='secret')
+        objs = InvitationKey.objects
+        remaining = objs.remaining_invitations_for_user(self.sample_user)
 
         # Invalid email data fails.
         response = self.client.post(reverse('invitation_invite'),
                                     data={'email': 'example.com'})
         self.assertEqual(response.status_code, 200)
-        self.failUnless(response.context['form'])
-        self.failUnless(response.context['form'].errors)
+        self.assertTrue(response.context['form'] is not None)
+        self.assertTrue(response.context['form'].errors is not None)
 
         # Valid email data succeeds.
         response = self.client.post(reverse('invitation_invite'),
                                     data={'email': 'foo@example.com'})
         self.assertRedirect(response, 'invitation_complete')
         self.assertEqual(InvitationKey.objects.count(), 3)
-        self.assertEqual(InvitationKey.objects.remaining_invitations_for_user(self.sample_user), remaining_invitations - 1)
+        self.assertEqual(objs.remaining_invitations_for_user(self.sample_user),
+                         remaining - 1)
 
         # Once remaining invitations exhausted, you fail again.
-        while InvitationKey.objects.remaining_invitations_for_user(self.sample_user) > 0:
+        while objs.remaining_invitations_for_user(self.sample_user) > 0:
             self.client.post(reverse('invitation_invite'),
                              data={'email': 'foo@example.com'})
-        self.assertEqual(InvitationKey.objects.remaining_invitations_for_user(self.sample_user), 0)
+        self.assertEqual(objs.remaining_invitations_for_user(self.sample_user),
+                         0)
         response = self.client.post(reverse('invitation_invite'),
                                     data={'email': 'foo@example.com'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['remaining_invitations'], 0)
-        self.failUnless(response.context['form'])
+        self.assertTrue(response.context['form'] is not None)
 
     def test_invited_view(self):
         """
@@ -313,27 +342,29 @@ class InvitationViewTestsRegistration(InvitationTestCaseRegistration):
         """
         # Valid key puts use the invited template.
         response = self.client.get(reverse('invitation_invited',
-                                           kwargs={'invitation_key': self.sample_key.key}))
+                            kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'invitation/invited.html')
 
         # Expired key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                                           kwargs={'invitation_key': self.expired_key.key}))
+                           kwargs={'invitation_key': self.expired_key.key}))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'invitation/wrong_invitation_key.html')
+
+        wrong_key_template = 'invitation/wrong_invitation_key.html'
+        self.assertTemplateUsed(response, wrong_key_template)
 
         # Invalid key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
                                            kwargs={'invitation_key': 'foo'}))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'invitation/wrong_invitation_key.html')
+        self.assertTemplateUsed(response, wrong_key_template)
 
         # Nonexistent key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                                           kwargs={'invitation_key': sha.new('foo').hexdigest()}))
+                   kwargs={'invitation_key': sha('foo'.encode()).hexdigest()}))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'invitation/wrong_invitation_key.html')
+        self.assertTemplateUsed(response, wrong_key_template)
 
     def test_register_view(self):
         """
@@ -342,7 +373,7 @@ class InvitationViewTestsRegistration(InvitationTestCaseRegistration):
         """
         # This won't work if registration isn't installed
         if not registration_installed:
-            print "** Skipping test requiring django-registration **"
+            print ("** Skipping test requiring django-registration **")
             return
 
         # The first use of the key to register a new user works.
@@ -362,7 +393,7 @@ class InvitationViewTestsRegistration(InvitationTestCaseRegistration):
         self.assertTemplateUsed(response,
                                 'invitation/wrong_invitation_key.html')
         try:
-            even_newer_user = User.objects.get(username='even_newer_user')
+            _ = User.objects.get(username='even_newer_user')
             self.fail("Invitation already used - No user should be created.")
         except User.DoesNotExist:
             pass
@@ -382,33 +413,37 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
 
         """
         # You need to be logged in to send an invite.
-        response = self.client.login(username='alice', password='secret')
-        remaining_invitations = InvitationKey.objects.remaining_invitations_for_user(self.sample_user)
+        _ = self.client.login(username='alice', password='secret')
+        objs = InvitationKey.objects
+        remaining = objs.remaining_invitations_for_user(self.sample_user)
 
         # Invalid email data fails.
         response = self.client.post(reverse('invitation_invite'),
                                     data={'email': 'example.com'})
         self.assertEqual(response.status_code, 200)
-        self.failUnless(response.context['form'])
-        self.failUnless(response.context['form'].errors)
+        self.assertTrue(response.context['form'] is not None)
+        self.assertTrue(response.context['form'].errors is not None)
 
         # Valid email data succeeds.
         response = self.client.post(reverse('invitation_invite'),
                                     data={'email': 'foo@example.com'})
+
         self.assertRedirect(response, 'invitation_complete')
         self.assertEqual(InvitationKey.objects.count(), 3)
-        self.assertEqual(InvitationKey.objects.remaining_invitations_for_user(self.sample_user), remaining_invitations - 1)
+        self.assertEqual(objs.remaining_invitations_for_user(self.sample_user),
+                         remaining - 1)
 
         # Once remaining invitations exhausted, you fail again.
-        while InvitationKey.objects.remaining_invitations_for_user(self.sample_user) > 0:
+        while objs.remaining_invitations_for_user(self.sample_user) > 0:
             self.client.post(reverse('invitation_invite'),
                              data={'email': 'foo@example.com'})
-        self.assertEqual(InvitationKey.objects.remaining_invitations_for_user(self.sample_user), 0)
+        self.assertEqual(objs.remaining_invitations_for_user(self.sample_user),
+                         0)
         response = self.client.post(reverse('invitation_invite'),
                                     data={'email': 'foo@example.com'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['remaining_invitations'], 0)
-        self.failUnless(response.context['form'])
+        self.assertTrue(response.context['form'] is not None)
 
     def test_invited_view(self):
         """
@@ -418,27 +453,28 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
         """
         # Valid key puts use the invited template.
         response = self.client.get(reverse('invitation_invited',
-                                           kwargs={'invitation_key': self.sample_key.key}))
+                               kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'invitation/invited.html')
 
+        wrong_key_template = 'invitation/wrong_invitation_key.html'
         # Expired key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                                           kwargs={'invitation_key': self.expired_key.key}))
+                           kwargs={'invitation_key': self.expired_key.key}))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'invitation/wrong_invitation_key.html')
+        self.assertTemplateUsed(response, wrong_key_template)
 
         # Invalid key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
                                            kwargs={'invitation_key': 'foo'}))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'invitation/wrong_invitation_key.html')
+        self.assertTemplateUsed(response, wrong_key_template)
 
         # Nonexistent key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                                           kwargs={'invitation_key': sha.new('foo').hexdigest()}))
+                   kwargs={'invitation_key': sha('foo'.encode()).hexdigest()}))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'invitation/wrong_invitation_key.html')
+        self.assertTemplateUsed(response, wrong_key_template)
 
     def test_register_view(self):
         """
@@ -447,14 +483,15 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
         """
         # This won't work if registration isn't installed
         if not allauth_installed:
-            print "** Skipping test requiring django-allauth **"
+            print ("** Skipping test requiring django-allauth **")
             return
 
         # The first use of the key to register a new user works.
         registration_data = self.sample_allauth_data.copy()
 
         # User has to go through 'invited' first
-        response = self.client.get(reverse('invitation_invited', kwargs={'invitation_key': self.sample_key.key}))
+        response = self.client.get(reverse('invitation_invited',
+                               kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response,
                                 'invitation/invited.html')
@@ -462,7 +499,8 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
         # If the key gets approved it should be stored in the session
         self.assertIn('invitation_key', self.client.session)
 
-        response = self.client.post(reverse('account_signup'), data=registration_data)
+        response = self.client.post(reverse('account_signup'),
+                                    data=registration_data)
         self.assertEqual(response.status_code, 302)
 
         # Check that the key has been removed from the session data
@@ -475,7 +513,8 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
 
         # Trying to reuse the same key then fails.
         registration_data['username'] = 'even_newer_user'
-        response = self.client.post(reverse('invitation_invited', kwargs={'invitation_key': self.sample_key.key}))
+        response = self.client.post(reverse('invitation_invited',
+                            kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response,
                                 'invitation/wrong_invitation_key.html')
@@ -483,7 +522,8 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
 
 class InviteModeOffTestsRegistration(InvitationTestCaseRegistration):
     """
-    Tests for the case where INVITE_MODE is False and django-registration is used as the backend.
+    Tests for the case where INVITE_MODE is False and django-registration is
+    used as the backend.
 
     (The test cases other than this one generally assume that INVITE_MODE is
     True.)
@@ -491,14 +531,17 @@ class InviteModeOffTestsRegistration(InvitationTestCaseRegistration):
     """
     def setUp(self):
         super(InviteModeOffTestsRegistration, self).setUp()
-        self.saved_invite_mode = settings.INVITE_MODE
+        self.saved_invite_mode = getattr(settings, 'INVITE_MODE', None)
         settings.INVITE_MODE = False
-        self.saved_socialaccount_providers = settings.SOCIALACCOUNT_PROVIDERS
+        self.saved_socialaccounts = getattr(settings,
+                                            'SOCIALACCOUNT_PROVIDERS', None)
         settings.SOCIALACCOUNT_PROVIDERS = {}
 
     def tearDown(self):
-        settings.INVITE_MODE = self.saved_invite_mode
-        settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccount_providers
+        if self.saved_invite_mode is not None:
+            settings.INVITE_MODE = self.saved_invite_mode
+        if self.saved_socialaccounts is not None:
+            settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccounts
         super(InviteModeOffTestsRegistration, self).tearDown()
 
     def test_invited_view(self):
@@ -508,7 +551,7 @@ class InviteModeOffTestsRegistration(InvitationTestCaseRegistration):
         """
         # This won't work if registration isn't installed
         if not registration_installed:
-            print "** Skipping test requiring django-registration **"
+            print ("** Skipping test requiring django-registration **")
             return
 
         response = self.client.get(reverse('invitation_invited',
@@ -530,7 +573,8 @@ class InviteModeOffTestsRegistration(InvitationTestCaseRegistration):
         # get
         response = self.client.get(reverse('registration_register'))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'registration/registration_form.html')
+        self.assertTemplateUsed(response,
+                                'registration/registration_form.html')
 
         # post
         response = self.client.post(reverse('registration_register'),
@@ -549,14 +593,17 @@ class InviteModeOffTestsAllauth(InvitationTestCaseAllauth):
     """
     def setUp(self):
         super(InviteModeOffTestsAllauth, self).setUp()
-        self.saved_invite_mode = settings.INVITE_MODE
+        self.saved_invite_mode = getattr(settings, 'INVITE_MODE', None)
         settings.INVITE_MODE = False
-        self.saved_socialaccount_providers = settings.SOCIALACCOUNT_PROVIDERS
+        self.saved_socialaccounts = getattr(settings,
+                                            'SOCIALACCOUNT_PROVIDERS', None)
         settings.SOCIALACCOUNT_PROVIDERS = {}
 
     def tearDown(self):
-        settings.INVITE_MODE = self.saved_invite_mode
-        settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccount_providers
+        if self.saved_invite_mode is not None:
+            settings.INVITE_MODE = self.saved_invite_mode
+        if self.saved_socialaccounts is not None:
+            settings.SOCIALACCOUNT_PROVIDERS = self.saved_socialaccounts
         super(InviteModeOffTestsAllauth, self).tearDown()
 
     def test_invited_view(self):
@@ -566,7 +613,7 @@ class InviteModeOffTestsAllauth(InvitationTestCaseAllauth):
         """
         # This won't work if registration isn't installed
         if not allauth_installed:
-            print "** Skipping test requiring django-allauth **"
+            print ("** Skipping test requiring django-allauth **")
             return
 
         response = self.client.get(reverse('invitation_invited',
@@ -583,12 +630,13 @@ class InviteModeOffTestsAllauth(InvitationTestCaseAllauth):
         """
         # This won't work if registration isn't installed
         if not allauth_installed:
-            print "** Skipping test requiring django-allauth **"
+            print ("** Skipping test requiring django-allauth **")
             return
 
         # TODO fix this.  But for now I'm not going to bother since we could
         # simply remove invitation altogether if we don't want to use the
         # invitation code, or bypass the URL somehow.
-        response = self.client.get(reverse('registration_register'))
-        self.assertEqual(response.status_code, 302)
+        response = self.client.get(reverse('registration_register'),
+                                   follow=True)
+        self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'account/signup.html')

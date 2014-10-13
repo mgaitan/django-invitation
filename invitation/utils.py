@@ -57,10 +57,11 @@ def class_for_name(module_name, class_name):
 
 
 def get_invitation_key(user):
-    salt = sha_constructor(str(random.random())).hexdigest()[:5]
+    salt = sha_constructor(str(random.random()).encode()).hexdigest()[:5]
     nowish = datetime.datetime.now()
     user_str = user.get_username()
-    key = sha_constructor("%s%s%s" % (nowish, salt, user_str)).hexdigest()
+    key_str = "%s%s%s" % (nowish, salt, user_str)
+    key = sha_constructor(key_str.encode()).hexdigest()
     return key
 
 
@@ -87,7 +88,7 @@ class DefaultTokenGenerator(BaseTokenGenerator):
         import urllib2
         from urlparse import urlparse, urlunparse
 
-        site, root_url = get_site()
+        _, root_url = get_site()
 
         def stamp(image, text, offset):
                 f = ImageFont.load_default()
@@ -118,7 +119,8 @@ class DefaultTokenGenerator(BaseTokenGenerator):
         image = Image.open(temp_img.name)
 
         # stamp expiration date
-        expiration_date = instance.date_invited + datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS)
+        delta = datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS)
+        expiration_date = instance.date_invited + delta
         exp_text = expiration_date.strftime("%x")
         stamp(image, exp_text, 18)
 

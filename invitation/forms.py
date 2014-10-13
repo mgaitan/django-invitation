@@ -21,7 +21,8 @@ class DefaultInvitationKeyForm(BaseInvitationKeyForm):
     def __init__(self, *args, **kwargs):
         self.remaining_invitations = kwargs.pop('remaining_invitations', None)
         self.user = kwargs.pop('user', None)
-        self.invitation_blacklist = getattr(settings, 'INVITATION_BLACKLIST', ())
+        self.invitation_blacklist = getattr(settings, 'INVITATION_BLACKLIST',
+                                            ())
 
         super(DefaultInvitationKeyForm, self).__init__(*args, **kwargs)
 
@@ -40,14 +41,16 @@ class DefaultInvitationKeyForm(BaseInvitationKeyForm):
 
         if 'email' in self.cleaned_data:
             for email_match in self.invitation_blacklist:
-                if re.search(email_match, self.cleaned_data['email']) is not None:
+                search = re.search(email_match, self.cleaned_data['email'])
+                if search is not None:
                     err = _("Thanks, but there's no need to invite us!")
                     self._errors['email'] = self.error_class([err])
                     del cleaned_data['email']
                     break
 
         if 'sender_note' in self.cleaned_data:
-            if not self.user.is_staff and len(cleaned_data['sender_note']) > 500:
+            note_length = len(cleaned_data['sender_note'])
+            if not self.user.is_staff and note_length > 500:
                 err = _("Your note must be less than 500 characters")
                 self._errors['sender_note'] = self.error_class([err])
 

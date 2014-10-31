@@ -8,16 +8,12 @@ from django.utils.safestring import mark_safe
 from invitation import (utils, models)
 from invitation.models import InvitationKey
 
+import logging
+logger = logging.getLogger(__name__)
 
 reg_backend_str = getattr(settings, 'INVITE_REGISTRATION_BACKEND',
-                       'allauth.account.auth_backends.AuthenticationBackend')
+                          'allauth.account.auth_backends.AuthenticationBackend')
 DefaultBackend = utils.str_to_class(reg_backend_str)
-
-# TODO: delete when sure don't need
-# if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
-#     from allauth.account.auth_backends import AuthenticationBackend
-# else:
-#     from registration.backends.default import DefaultBackend
 
 
 class BaseRegistrationBackend():
@@ -62,16 +58,33 @@ class AllAuthRegistrationBackend(RegistrationBackend):
     backend = 'allauth.account.auth_backends.AuthenticationBackend'
 
     def get_registration_form(self):
-        from allauth.socialaccount.forms import SignupForm
+        from allauth.account.forms import SignupForm
         return SignupForm
 
     def get_registration_view(self):
-        from allauth.account.views import signup as allauth_signup
+        allauth_signup = self.get_signup_view()
 
         def register(request, backend, success_url, form_class, disallowed_url,
                      template_name, extra_context):
             return allauth_signup(request, template_name=template_name)
         return register
+
+    def get_signup_view(self):
+        from allauth.account.views import signup
+        return signup
+
+
+class AllAuthSocialRegistrationBackend(AllAuthRegistrationBackend):
+
+    template = 'socialaccount/signup.html'
+
+    def get_registration_form(self):
+        from allauth.socialaccount.forms import SignupForm
+        return SignupForm
+
+    def get_signup_view(self):
+        from allauth.socialaccount.views import signup
+        return signup
 
 
 class InvitationMixin():
@@ -103,7 +116,14 @@ class BaseDeliveryBackend():
         self.data = data
 
     def get_recipient_dict(self):
-        raise NotImplementedError("Create a subclass and implement method")
+        """
+        if there is a 'groups' parameter the value is stashed in the
+        InvitationKey.groups field in order to add the user to the groups upon
+        signup completion
+        """
+        if 'groups' in self.data:
+            return {models.KEY_GROUPS: self.data.get('groups')}
+        return {}
 
     def create_invitation(self, user):
         recipient_dict = self.get_recipient_dict()
@@ -122,13 +142,16 @@ class BaseDeliveryBackend():
         raise NotImplementedError("Create a subclass and implement method")
 
 
+# TODO: figure out option for doing this as async(celery) task
 class EmailDeliveryBackend(BaseDeliveryBackend):
     subject_template = 'invitation/invitation_email_subject.txt'
     html_template = 'invitation/invitation_email.html'
     text_template = 'invitation/invitation_email.txt'
 
     def get_recipient_dict(self):
-        return {models.KEY_EMAIL: self.data.get('email')}
+        d = super(EmailDeliveryBackend, self).get_recipient_dict()
+        d.update({models.KEY_EMAIL: self.data.get('email')})
+        return d
 
     def get_extra_context(self):
         return {'sender_note': self.data.get("sender_note", "")}

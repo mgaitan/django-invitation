@@ -2,6 +2,7 @@ import datetime
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.utils.translation import ugettext_lazy as _
 from django.utils.timezone import now
 from django.core.urlresolvers import reverse
@@ -10,12 +11,6 @@ from django.db import connection
 from invitation import utils
 from invitation.signals import (invite_invited, invite_accepted)
 
-# TODO: delete once we're sure it's not needed
-# if getattr(settings, 'INVITATION_USE_ALLAUTH', False):
-#     import re
-#     SHA1_RE = re.compile('^[a-f0-9]{40}$')
-# else:
-#     from registration.models import SHA1_RE
 
 token_generator = None
 if getattr(settings, 'INVITATION_USE_TOKEN', False):
@@ -25,8 +20,8 @@ if getattr(settings, 'INVITATION_USE_TOKEN', False):
 KEY_EMAIL = "recipient_email"
 KEY_FNAME = "recipient_first_name"
 KEY_LNAME = "recipient_last_name"
-KEY_PHONE = "recipient_phone_number"
 KEY_OTHER = "recipient_other"
+KEY_GROUPS = "groups"
 
 
 class InvitationKeyManager(models.Manager):
@@ -51,12 +46,11 @@ class InvitationKeyManager(models.Manager):
             return invitation_key
         return False
 
-    def create_invitation(self, user,
-                          recipient_dict={
-                                KEY_EMAIL: 'recipient@email.com',
-                                KEY_FNAME: 'Firstname',
-                                KEY_LNAME: 'Lastname',
-                        }, save=True):
+    def create_invitation(self, user, recipient_dict={
+        KEY_EMAIL: 'recipient@email.com',
+        KEY_FNAME: 'Firstname',
+        KEY_LNAME: 'Lastname',
+    }, save=True):
         """
         Create an ``InvitationKey`` and returns it.
 
@@ -118,8 +112,9 @@ class InvitationKey(models.Model):
                                             blank=True)
     recipient_last_name = models.CharField(max_length=24, default="",
                                            blank=True)
-    recipient_phone_number = models.CharField(max_length=15, blank=True)
     recipient_other = models.CharField(max_length=255, default="", blank=True)
+
+    groups = models.TextField(default="", blank=True)
 
     def __str__(self):
         from_user = self.from_user.get_username()
@@ -174,6 +169,15 @@ class InvitationKey(models.Model):
         self.from_user.invitationuser.increment_accepted()
         self.save()
 
+    def group_user(self, registrant):
+        """
+        Add the user to any groups that have been stashed in the key
+        """
+        if self.groups is not None:
+            groups_qs = Group.objects.filter(name__in=self.groups.split(','))
+            group_list = [group for group in groups_qs]
+            registrant.groups.add(*group_list)
+
     def get_context(self, extra_context={}):
         site, root_url = utils.get_site()
         invitation_url = root_url + reverse('invitation_invited',
@@ -182,18 +186,17 @@ class InvitationKey(models.Model):
         delta = datetime.timedelta(days=settings.ACCOUNT_INVITATION_DAYS)
         exp_date = self.date_invited + delta
         context = {'invitation_key': self,
-                    'expiration_days': settings.ACCOUNT_INVITATION_DAYS,
-                    'from_user': self.from_user,
-                    'site': site,
-                    'root_url': root_url,
-                    'expiration_date': exp_date,
-                    'recipient_email': self.recipient_email,
-                    'recipient_first_name': self.recipient_first_name,
-                    'recipient_last_name': self.recipient_last_name,
-                    'recipient_phone_number': self.recipient_phone_number,
-                    'recipient_other': self.recipient_other,
-                    'token': self.generate_token(invitation_url),
-                    'invitation_url': invitation_url}
+                   'expiration_days': settings.ACCOUNT_INVITATION_DAYS,
+                   'from_user': self.from_user,
+                   'site': site,
+                   'root_url': root_url,
+                   'expiration_date': exp_date,
+                   'recipient_email': self.recipient_email,
+                   'recipient_first_name': self.recipient_first_name,
+                   'recipient_last_name': self.recipient_last_name,
+                   'recipient_other': self.recipient_other,
+                   'token': self.generate_token(invitation_url),
+                   'invitation_url': invitation_url}
         context.update(extra_context)
         return context
 
@@ -261,16 +264,20 @@ class InvitationUser(models.Model):
     def invites_remaining(self):
         if self.invites_allocated == -1:
             return -1
-        return self.invites_allocated - self.inviter.invitations_sent.count()
+        return self.invites_allocated - self.invites_sent()
+
+    def invites_sent(self):
+        return self.inviter.invitations_sent.count()
 
     def can_send(self):
         if self.invites_allocated == -1:
             return True
-        return self.invites_allocated > self.inviter.invitations_sent.count()
+        return self.invites_allocated > self.invites_sent()
     can_send.boolean = True
 
 
-#TODO: check to see if there is an outstanding invite for this user
+# TODO: check to see if there is an outstanding invite for this user
+# to see if we need to trigger the independently_joined signal
 def user_post_save(sender, instance, created, **kwargs):
     """Create InvitationUser for user when User is created."""
     if created:

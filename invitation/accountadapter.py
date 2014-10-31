@@ -1,5 +1,5 @@
 from allauth.account.adapter import DefaultAccountAdapter
-#from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.exceptions import ImmediateHttpResponse
 from invitation.models import InvitationKey
 from allauth.account.signals import user_signed_up
@@ -8,6 +8,9 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.dispatch import receiver
 from django.shortcuts import render
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class InvitationAccountAdapter(DefaultAccountAdapter):
@@ -40,6 +43,37 @@ class InvitationAccountAdapter(DefaultAccountAdapter):
         return False
 
 
+class InvitationSocialAccountAdapter(DefaultSocialAccountAdapter):
+    """
+    Checks whether or not the site is open for signups.
+    Next to simply returning True/False you can also intervene the
+    regular flow by raising an ImmediateHttpResponse
+    """
+    def is_open_for_signup(self, request, sociallogin):
+        #print ('is open for sign up session keys', request.session.keys())
+        if getattr(settings, 'ALLOW_NEW_REGISTRATIONS', False):
+            if getattr(settings, 'INVITE_MODE', False):
+                invitation_key = request.session.get('invitation_key', False)
+                if invitation_key:
+                    if InvitationKey.objects.is_key_valid(invitation_key):
+                        #TODO: get the social account email somehow
+                        #invitation_recipient =\
+                        #    request.session.get('invitation_recipient', False)
+                        #self.stash_verified_email(request,
+                        #                          invitation_recipient[0])
+                        return True
+                    else:
+                        extra_context =\
+                            request.session.get('invitation_context', {})
+                        template_name = 'invitation/wrong_invitation_key.html'
+                        raise ImmediateHttpResponse(render(request,
+                                                           template_name,
+                                                           extra_context))
+            else:
+                return True
+        return False
+
+
 @receiver(user_signed_up)
 def complete_signup(sender, **kwargs):
     user = kwargs.pop('user')
@@ -56,6 +90,7 @@ def complete_signup(sender, **kwargs):
         invitation_key = request.session.get('invitation_key', False)
         key = InvitationKey.objects.get_key(invitation_key)
         if key is not None:
+            key.group_user(user)
             key.mark_used(user)
         del request.session['invitation_key']
         del request.session['invitation_recipient']

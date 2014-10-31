@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
 from django.http import HttpResponseRedirect
@@ -12,6 +13,9 @@ from django.utils.translation import ugettext_lazy as _
 
 from invitation import utils, models
 from invitation.models import InvitationKey
+
+import logging
+logger = logging.getLogger(__name__)
 
 reg_backend_class = utils.get_registration_backend_class()
 reg_backend = reg_backend_class()
@@ -27,7 +31,7 @@ objs = InvitationKey.objects
 remaining_invitations_for_user = objs.remaining_invitations_for_user
 
 
-def invited(request, invitation_key=None, invite_recipient=None,
+def invited(request, invitation_key=None, invitation_recipient=None,
             extra_context=None):
     if getattr(settings, 'INVITE_MODE', False):
         if extra_context is not None:
@@ -37,6 +41,7 @@ def invited(request, invitation_key=None, invite_recipient=None,
         valid_key_obj = is_key_valid(invitation_key)
         if invitation_key and valid_key_obj:
             template_name = 'invitation/invited.html'
+            extra_context.update({'invitation_key': invitation_key})
         else:
             if invitation_key:
                 extra_context.update({'invitation_key': invitation_key})
@@ -54,10 +59,12 @@ def invited(request, invitation_key=None, invite_recipient=None,
             template_name = 'invitation/wrong_invitation_key.html'
 
         if valid_key_obj:
-            invite_recipient = valid_key_obj.recipient() or invite_recipient
-            extra_context.update({'invitation_recipient': invite_recipient})
+            invitation_recipient = valid_key_obj.recipient() or \
+                invitation_recipient
+            extra_context\
+                .update({'invitation_recipient': invitation_recipient})
             request.session['invitation_key'] = valid_key_obj.key
-            request.session['invitation_recipient'] = invite_recipient
+            request.session['invitation_recipient'] = invitation_recipient
             request.session['invitation_context'] = extra_context or {}
 
         return render(request, template_name, extra_context)
@@ -66,13 +73,12 @@ def invited(request, invitation_key=None, invite_recipient=None,
 
 
 def register(request, backend, success_url=None,
-            form_class=RegistrationForm,
-            disallowed_url='registration_disallowed',
-            post_registration_redirect=None,
-            template_name=registration_template,
-            wrong_template_name='invitation/wrong_invitation_key.html',
-            extra_context=None):
-
+             form_class=RegistrationForm,
+             disallowed_url='registration_disallowed',
+             post_registration_redirect=None,
+             template_name=registration_template,
+             wrong_template_name='invitation/wrong_invitation_key.html',
+             extra_context=None):
     extra_context = extra_context is not None and extra_context.copy() or {}
     if getattr(settings, 'INVITE_MODE', False):
         invitation_key = request.REQUEST.get('invitation_key', False)
@@ -80,8 +86,8 @@ def register(request, backend, success_url=None,
             extra_context.update({'invitation_key': invitation_key})
             if is_key_valid(invitation_key):
                 return registration_register(request, backend, success_url,
-                                            form_class, disallowed_url,
-                                            template_name, extra_context)
+                                             form_class, disallowed_url,
+                                             template_name, extra_context)
             else:
                 extra_context.update({'invalid_key': True})
         else:
@@ -95,9 +101,9 @@ def register(request, backend, success_url=None,
 
 @login_required
 def invite(request, success_url=None,
-            form_class=InvitationKeyForm,
-            template_name='invitation/invitation_form.html',
-            extra_context=None):
+           form_class=InvitationKeyForm,
+           template_name='invitation/invitation_form.html',
+           extra_context=None):
     extra_context = extra_context is not None and extra_context.copy() or {}
     remaining_invitations = remaining_invitations_for_user(request.user)
     if request.method == 'POST':
@@ -105,17 +111,29 @@ def invite(request, success_url=None,
                           remaining_invitations=remaining_invitations,
                           user=request.user)
         if form.is_valid():
-            delivery_backend_class = utils.get_delivery_backend_class()
-            delivery_backend = delivery_backend_class(form.cleaned_data)
-            invite = delivery_backend.create_invitation(request.user)
-            invite.send_to(delivery_backend)
+            # check to see if the recipient is already a member (if there
+            # is an email address)
+            existing_user = None
+            if 'email' in form.cleaned_data:
+                email_addr = form.cleaned_data.get('email')
+                try:
+                    existing_user = User.objects.get(email=email_addr)
+                    extra_context.update({'recipient_already_user': True})
+                except User.DoesNotExist:
+                    pass
+            if existing_user is None:
+                # TODO: make this changeable per request
+                delivery_backend_class = utils.get_delivery_backend_class()
+                delivery_backend = delivery_backend_class(form.cleaned_data)
+                invite = delivery_backend.create_invitation(request.user)
+                invite.send_to(delivery_backend)
 
-            # success_url needs to be dynamically generated here; setting a
-            # a default value using reverse() will cause circular-import
-            # problems with the default URLConf for this application, which
-            # imports this file.
-            success_url = success_url or reverse('invitation_complete')
-            return HttpResponseRedirect(success_url)
+                # success_url needs to be dynamically generated here; setting a
+                # a default value using reverse() will cause circular-import
+                # problems with the default URLConf for this application, which
+                # imports this file.
+                success_url = success_url or reverse('invitation_complete')
+                return HttpResponseRedirect(success_url)
     else:
         form = form_class()
     objs = InvitationKey.objects
@@ -133,7 +151,7 @@ def invite(request, success_url=None,
 
 @staff_member_required
 def send_bulk_invitations(request, success_url=None):
-    #current_site, root_url = utils.get_site(request)
+    # current_site, root_url = utils.get_site(request)
     if request.POST.get('post'):
         to_emails = [(e.split(',')[0].strip(), e.split(',')[1].strip() or None,
                       e.split(',')[2].strip() or None) if e.find(',') + 1 else
@@ -147,7 +165,7 @@ def send_bulk_invitations(request, success_url=None):
                 if recipient[0]:
                     objs = InvitationKey.objects
                     invitation = objs.create_invitation(request.user,
-                                                {models.KEY_EMAIL: recipient})
+                                                        {models.KEY_EMAIL: recipient})
                     try:
                         invitation.send_to(from_email, mark_safe(sender_note))
                     except:
@@ -174,8 +192,8 @@ def send_bulk_invitations(request, success_url=None):
             'text_preview': render_to_string(text_template, preview_context),
         }
         return render_to_response('invitation/invitation_form_bulk.html',
-                          context,
-                          context_instance=RequestContext(request))
+                                  context,
+                                  context_instance=RequestContext(request))
 
 
 def token(request, key):

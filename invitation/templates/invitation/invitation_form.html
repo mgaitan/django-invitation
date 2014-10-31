@@ -5,6 +5,9 @@
 
 <div class="invitation invitation-invite">
 	<h1>{% trans "Invite a friend" %}</h1>
+	{% if recipient_already_user %}
+	<p><b>{%trans "The recipient is already a user" %}</b></p>
+	{% endif %}
 	{% ifequal remaining_invitations 0 %}
 	<p>{% trans "You currently have no invitations to send." %}</p>
 	{% else %}

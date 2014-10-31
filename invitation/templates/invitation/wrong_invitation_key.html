@@ -2,6 +2,11 @@
 
 {% block invitation_content %}
 
-Invalid invitation key!
+<h3>Invalid invitation key!</h3>
+
+{% if expired_key %}Key expired{% endif %}
+{% if no_uses_left_key %}Key has already been used{% endif %}
+{% if no_key %}Key is missing{% endif %}
+{% if invalid_key %}Key is invalid: {{invitation_key}} {% endif %}
 
 {% endblock %}

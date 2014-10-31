@@ -105,8 +105,8 @@ class InvitationTestCaseRegistration(InvitationTestCase):
 
     def setUp(self):
         super(InvitationTestCaseRegistration, self).setUp()
-        #self.saved_invitation_use_allauth = settings.INVITATION_USE_ALLAUTH
-        #settings.INVITATION_USE_ALLAUTH = False
+        # self.saved_invitation_use_allauth = settings.INVITATION_USE_ALLAUTH
+        # settings.INVITATION_USE_ALLAUTH = False
         self.saved_invite_mode = getattr(settings, 'INVITE_MODE', None)
         settings.INVITE_MODE = True
         social_accounts = getattr(settings, 'SOCIALACCOUNT_PROVIDERS', None)
@@ -115,7 +115,7 @@ class InvitationTestCaseRegistration(InvitationTestCase):
 
     def tearDown(self):
         super(InvitationTestCaseRegistration, self).tearDown()
-        #settings.INVITATION_USE_ALLAUTH = self.saved_invitation_use_allauth
+        # settings.INVITATION_USE_ALLAUTH = self.saved_invitation_use_allauth
         if self.saved_invite_mode is not None:
             settings.INVITE_MODE = self.saved_invite_mode
         if self.saved_socialaccounts is not None:
@@ -263,19 +263,19 @@ class InvitationFormTests(InvitationTestCase):
         invalid_data_dicts = [
             # Invalid email.
             {
-            'data': {'email': 'example.com'},
-            'error': ('email', ["Enter a valid email address."])
+                'data': {'email': 'example.com'},
+                'error': ('email', ["Enter a valid email address."])
             },
             {
-             'data': {'email': 'an_address@mydomain.com'},
-             'error': ('email', ["Thanks, but there's no need to invite us!"])
+                'data': {'email': 'an_address@mydomain.com'},
+                'error': ('email', ["Thanks, but there's no need to invite us!"])
             }
             ]
 
         for invalid_dict in invalid_data_dicts:
             form = forms.DefaultInvitationKeyForm(data=invalid_dict['data'],
-                                           remaining_invitations=1,
-                                           user=self.sample_user)
+                                                  remaining_invitations=1,
+                                                  user=self.sample_user)
             self.assertFalse(form.is_valid())
             self.assertEqual(form.errors[invalid_dict['error'][0]],
                              invalid_dict['error'][1])
@@ -283,8 +283,8 @@ class InvitationFormTests(InvitationTestCase):
     def test_invitation_form(self):
         form = \
             forms.DefaultInvitationKeyForm(data={'email': 'foo@example.com'},
-                                       remaining_invitations=1,
-                                       user=self.sample_user)
+                                           remaining_invitations=1,
+                                           user=self.sample_user)
         print (form.errors)
         self.assertTrue(form.is_valid())
 
@@ -342,13 +342,13 @@ class InvitationViewTestsRegistration(InvitationTestCaseRegistration):
         """
         # Valid key puts use the invited template.
         response = self.client.get(reverse('invitation_invited',
-                            kwargs={'invitation_key': self.sample_key.key}))
+                                           kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'invitation/invited.html')
 
         # Expired key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                           kwargs={'invitation_key': self.expired_key.key}))
+                                           kwargs={'invitation_key': self.expired_key.key}))
         self.assertEqual(response.status_code, 200)
 
         wrong_key_template = 'invitation/wrong_invitation_key.html'
@@ -362,7 +362,8 @@ class InvitationViewTestsRegistration(InvitationTestCaseRegistration):
 
         # Nonexistent key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                   kwargs={'invitation_key': sha('foo'.encode()).hexdigest()}))
+                                           kwargs={'invitation_key':
+                                                   sha('foo'.encode()).hexdigest()}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, wrong_key_template)
 
@@ -453,14 +454,14 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
         """
         # Valid key puts use the invited template.
         response = self.client.get(reverse('invitation_invited',
-                               kwargs={'invitation_key': self.sample_key.key}))
+                                           kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'invitation/invited.html')
 
         wrong_key_template = 'invitation/wrong_invitation_key.html'
         # Expired key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                           kwargs={'invitation_key': self.expired_key.key}))
+                                           kwargs={'invitation_key': self.expired_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, wrong_key_template)
 
@@ -472,7 +473,8 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
 
         # Nonexistent key use the wrong key template.
         response = self.client.get(reverse('invitation_invited',
-                   kwargs={'invitation_key': sha('foo'.encode()).hexdigest()}))
+                                           kwargs={'invitation_key':
+                                                   sha('foo'.encode()).hexdigest()}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, wrong_key_template)
 
@@ -491,7 +493,7 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
 
         # User has to go through 'invited' first
         response = self.client.get(reverse('invitation_invited',
-                               kwargs={'invitation_key': self.sample_key.key}))
+                                           kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response,
                                 'invitation/invited.html')
@@ -514,7 +516,7 @@ class InvitationViewTestsAllauth(InvitationTestCaseAllauth):
         # Trying to reuse the same key then fails.
         registration_data['username'] = 'even_newer_user'
         response = self.client.post(reverse('invitation_invited',
-                            kwargs={'invitation_key': self.sample_key.key}))
+                                            kwargs={'invitation_key': self.sample_key.key}))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response,
                                 'invitation/wrong_invitation_key.html')
@@ -555,7 +557,7 @@ class InviteModeOffTestsRegistration(InvitationTestCaseRegistration):
             return
 
         response = self.client.get(reverse('invitation_invited',
-                            kwargs={'invitation_key': self.sample_key.key}))
+                                           kwargs={'invitation_key': self.sample_key.key}))
         self.assertRedirect(response, 'registration_register')
 
     def test_register_view(self):
@@ -617,7 +619,7 @@ class InviteModeOffTestsAllauth(InvitationTestCaseAllauth):
             return
 
         response = self.client.get(reverse('invitation_invited',
-                            kwargs={'invitation_key': self.sample_key.key}))
+                                           kwargs={'invitation_key': self.sample_key.key}))
         self.assertRedirect(response, 'registration_register')
 
     def test_register_view(self):

@@ -136,11 +136,11 @@ class DefaultTokenGenerator(BaseTokenGenerator):
         get_token_url = root_url + reverse('invitation_token',
                                            kwargs={'key': instance.key})
         token_html = ''.join(['<a style="display: inline-block;" href="',
-                             invitation_url,
-                             '"><img width="100" height="100" class="token"',
-                             ' src="',
-                             get_token_url,
-                             '" alt="invitation token"></a>'])
+                              invitation_url,
+                              '"><img width="100" height="100" class="token"',
+                              ' src="',
+                              get_token_url,
+                              '" alt="invitation token"></a>'])
         return token_html
 
     def token_view(self, request, key):
@@ -155,7 +155,7 @@ class DefaultTokenGenerator(BaseTokenGenerator):
         from urlparse import urlparse, urlunparse
         from invitation.models import InvitationKey
 
-        print  ('---token')
+        print ('---token')
         site = get_site(request)
         scheme = 'http'
         if request.is_secure():

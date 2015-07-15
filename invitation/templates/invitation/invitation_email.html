@@ -22,9 +22,9 @@
 					{% trans "Membership is by invitation only, so click the invitation token below to join us now!" %}<br><br>
 					{{token|safe}}
 				</div><br>
-				<div>			
+				<div>
 					{% trans "All the best" %},<br>
-					<span>{% trans "The" %} {{site.name}} {% trans "team" %}</span>
+					<span>{% blocktrans with site.name as sitename %} The {{sitename}} team{% endblocktrans %}</span>
 				</div>
 			</td>
 		</tr>

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2015-07-15 12:47-0300\n"
+"POT-Creation-Date: 2015-07-15 13:08-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -110,7 +110,7 @@ msgid ""
 "Membership is by invitation only, so click the invitation token below to "
 "join us now!"
 msgstr ""
-"Las membresías son sólo por invitación. Clickea en el código de abajo para  "
+"Las membresías son sólo por invitación. Has click en la url de abajo para  "
 "unirtenos!"
 
 #: templates/invitation/invitation_email.html:26
@@ -118,12 +118,8 @@ msgid "All the best"
 msgstr "Atentamente"
 
 #: templates/invitation/invitation_email.html:27
-msgid "The"
-msgstr "El"
-
-#: templates/invitation/invitation_email.html:27
-msgid "team"
-msgstr "equipo"
+msgid " The %(sitename)s team"
+msgstr " El equipo de %(sitename)s"
 
 #: templates/invitation/invitation_email.txt:2
 #, fuzzy, python-format
@@ -192,7 +188,7 @@ msgstr ""
 #, fuzzy
 #| msgid "Send Invitation"
 msgid "Send Invitation "
-msgstr "Enviar invitación"
+msgstr "Enviar invitación "
 
 #: templates/invitation/invited.html:6
 msgid "You have been invited!"
@@ -212,10 +208,4 @@ msgstr "Email enviado satisfactoriamente"
 
 #: views.py:178
 msgid "You did not provide any email addresses."
-msgstr "No has ingresado ningún email"
-
-#~ msgid "Go to"
-#~ msgstr "Ir "
-
-#~ msgid "to join!"
-#~ msgstr "para sumarte!"
+msgstr "No has ingresado ningún email."

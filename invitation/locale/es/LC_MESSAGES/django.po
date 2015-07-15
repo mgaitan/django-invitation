@@ -1,0 +1,213 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2015-07-15 12:13-0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: forms.py:33
+msgid "Sorry, you don't have any invitations left"
+msgstr "Lo sentimos, no tiene más invitaciones disponibles"
+
+#: forms.py:38
+msgid "You can't send an invitation to yourself"
+msgstr "No puedes enviarte una invitación a tí mismo"
+
+#: forms.py:46
+msgid "Thanks, but there's no need to invite us!"
+msgstr "Gracias, pero no hay necesidad de invitarnos a nosotros!"
+
+#: forms.py:54
+msgid "Your note must be less than 500 characters"
+msgstr "Tu nota debe tener menos de 500 caracteres"
+
+#: management/commands/user_invite_codes.py:11
+msgid ""
+"Show the number of users who signed up with this invitation code    in the "
+"given number of days"
+msgstr "Muestra el número de usuarios registrados con este código de invitación en el número de días dado"
+
+#: management/commands/user_invite_codes.py:18
+msgid "You need to supply an invitation code"
+msgstr "Debes ingresar un código de invitación"
+
+#: management/commands/user_invite_codes.py:27
+msgid "Something's wrong with the number of days you entered"
+msgstr "Algo está mal con el número de días que ingresaste"
+
+#: models.py:94
+msgid "invitation key"
+msgstr "Código de invitación"
+
+#: models.py:95
+msgid "date invited"
+msgstr "Fecha de la invitación"
+
+#: models.py:156
+msgid "never"
+msgstr "nunca"
+
+#: models.py:158
+msgid "Expiry date"
+msgstr "Fecha de vencimiento"
+
+#: templates/invitation/base.html:6
+msgid "Untitled Page"
+msgstr ""
+
+#: templates/invitation/invitation_complete.html:6
+msgid "Invitation sent"
+msgstr "Invitación enviada"
+
+#: templates/invitation/invitation_complete.html:8
+msgid "Your friend will receive an email with your invitation soon!"
+msgstr "En instantes su amigo recibirá un email con la invitación"
+
+#: templates/invitation/invitation_email.html:12
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t<pre id=\"sender_note\" style=\"white-space: pre-wrap; border: none; "
+"padding:0; margin:0; font-family:Helvetica, Arial, sans-serif; font-"
+"size:16px; line-height:20px; background:inherit; color:inherit; font-weight:"
+"inherit;\">%(sender_note)s</pre><br>\n"
+"\t\t\t\t"
+msgstr ""
+
+#: templates/invitation/invitation_email.html:16
+#, python-format
+msgid ""
+"\n"
+"\t\t\t\t<div>Congratulations! You have been invited by %(from_user)s to "
+"join\n"
+"\t\t\t\t"
+msgstr ""
+"\n"
+"\t\t\t\t<div>Felicitaciones, has sido invitado por %(from_user)s para  "
+"uni\n"
+"\t\t\t\t"
+
+
+#: templates/invitation/invitation_email.html:22
+msgid ""
+"Membership is by invitation only, so click the invitation token below to "
+"join us now!"
+msgstr ""
+"Las membresías son sólo por invitación. Clickea en el código de abajo para  "
+"unirtenos!"
+
+#: templates/invitation/invitation_email.html:26
+msgid "All the best"
+msgstr "Atentamente"
+
+#: templates/invitation/invitation_email.html:27
+msgid "The"
+msgstr "El"
+
+#: templates/invitation/invitation_email.html:27
+msgid "team"
+msgstr "equipo"
+
+#: templates/invitation/invitation_email.txt:2
+#, fuzzy, python-format
+#| msgid "You have been invited by %(username)s to join %(sitename)s!"
+msgid ""
+"\n"
+"Congratulations! You have been invited by %(from_user)s to join "
+"%(sitename)s.\n"
+msgstr "Felicitaciones! Has sido invitado por %(username)s para unirte a %(sitename)s!"
+
+#: templates/invitation/invitation_email.txt:7
+#, fuzzy, python-format
+#| msgid ""
+#| "All the best,\n"
+#| "\n"
+#| "The %(sitename)s Team"
+msgid ""
+"\n"
+"All the best,\n"
+"The %(sitename)s Team"
+msgstr ""
+"Atentamente,\n"
+"\n"
+"El equipo de %(sitename)s"
+
+#: templates/invitation/invitation_email_subject.txt:2
+#, python-format
+msgid "Invitation from %(username)s to join %(sitename)s"
+msgstr "Invitación de %(username)s para sumarte a %(sitename)s"
+
+#: templates/invitation/invitation_form.html:3
+#, fuzzy
+#| msgid "Invitation sent"
+msgid "Invitation"
+msgstr "Invitación enviada"
+
+#: templates/invitation/invitation_form.html:7
+msgid "Invite a friend"
+msgstr "Invita a un amigo"
+
+#: templates/invitation/invitation_form.html:9
+msgid "The recipient is already a user"
+msgstr "El destinatario ya es un usuario"
+
+#: templates/invitation/invitation_form.html:12
+msgid "You currently have no invitations to send."
+msgstr "No tienen invitaciones para enviar"
+
+#: templates/invitation/invitation_form.html:14
+#, python-format
+msgid ""
+"\n"
+"\t<p>You have <b>%(qty)s</b> invitations remaining!</p>\n"
+"\t<p>Enter your friend's information below to send an invitation:</p>\n"
+"\t"
+msgstr ""
+"\n"
+"\t<p>Tienes <b>%(qty)s</b> invitaciones disponibles</p>\n"
+"\t<p>Ingresa la información del destinatario abajo para enviar una invitación:</p>\n"
+"\t"
+
+#: templates/invitation/invitation_form.html:23
+#, fuzzy
+#| msgid "Send Invitation"
+msgid "Send Invitation "
+msgstr "Enviar invitación"
+
+#: templates/invitation/invited.html:6
+msgid "You have been invited!"
+msgstr "Has sido invitado!"
+
+#: templates/invitation/invited.html:8
+msgid "proceed to registration"
+msgstr "Continuar con la registración"
+
+#: views.py:141 views.py:184
+msgid "--your note will be inserted here--"
+msgstr "--tu nota será insertada aquí--"
+
+#: views.py:174
+msgid "Mail sent successfully"
+msgstr "Email enviado satisfactoriamente"
+
+#: views.py:178
+msgid "You did not provide any email addresses."
+msgstr "No has ingresado ningún email"
+
+#~ msgid "Go to"
+#~ msgstr "Ir "
+
+#~ msgid "to join!"
+#~ msgstr "para sumarte!"

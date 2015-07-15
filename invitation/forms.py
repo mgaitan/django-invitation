@@ -16,7 +16,7 @@ class BaseInvitationKeyForm(forms.Form):
 class DefaultInvitationKeyForm(BaseInvitationKeyForm):
     email = forms.EmailField()
     sender_note = forms.CharField(widget=forms.Textarea, required=False,
-                                  label='Your Note')
+                                  label=_('Your Note'))
 
     def __init__(self, *args, **kwargs):
         self.remaining_invitations = kwargs.pop('remaining_invitations', None)
